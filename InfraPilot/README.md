@@ -1,0 +1,68 @@
+# InfraPilot Workflow Module
+
+## InfraPilot Overview
+
+InfraPilot is a course project for turning structured backend decisions into infrastructure actions around AWS ECS on Fargate. This repository area currently focuses only on the workflow module described in `CC Final Project Plan.pdf`.
+
+## Where This Module Fits
+
+The workflow module sits between upstream interpretation and downstream execution. It receives structured intent, extracted entities, and project state, then turns them into deterministic execution plans and generated IaC artifacts.
+
+## What This Module Owns
+
+- deterministic workflow planning
+- validation of workflow-ready inputs
+- Jinja2-oriented rendering boundaries
+- IaC artifact generation
+
+## What This Module Does Not Do
+
+- natural-language parsing
+- backend API routing or persistence
+- direct Terraform, Docker, or AWS execution
+- CLI display or local command execution
+- generic DevOps decision-making outside the scoped InfraPilot workflows
+
+## Current Iteration Scope
+
+This iteration includes concrete schemas, a validation skeleton, a minimal Jinja2 renderer, and minimal `setup_infra` file generation. Execution behavior and broader template coverage remain deferred.
+
+## Planned High-Level Flow
+
+`structured intent + entities + project state -> validation -> workflow planning -> rendering -> execution plan + generated IaC files`
+
+## Initial Folder Layout
+
+```text
+InfraPilot/
+├── AGENTS.md
+├── README.md
+├── workflow/
+│   ├── __init__.py
+│   ├── builders/
+│   ├── validation/
+│   ├── rendering/
+│   │   └── renderer.py
+│   ├── templates/
+│   │   └── infra/
+│   │       └── main.tf.j2
+│   └── schemas/
+└── tests/
+    └── workflow/
+```
+
+- `workflow/` is named by responsibility rather than ownership.
+- `workflow/rendering/renderer.py` provides the minimal template-loading boundary for generated files.
+- `workflow/templates/infra/main.tf.j2` is intentionally limited to one minimal infrastructure file for `setup_infra`.
+- `schemas/` is reserved for future workflow-facing data contracts once team boundaries are finalized.
+
+## How Teammates Should Use This Repo
+
+- Read `AGENTS.md` first for scope and working rules.
+- Treat `CC Final Project Plan.pdf` as the main product boundary.
+- Keep changes incremental and easy to review.
+- Do not add execution logic here; this module should produce plans and files, not run commands.
+
+## Next Steps
+
+Future iterations should keep service rendering deferred for now and expand infrastructure coverage beyond the intentionally minimal `setup_infra` template only when those boundaries are approved.
