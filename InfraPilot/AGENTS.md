@@ -112,6 +112,8 @@ This module does not own:
 - A minimal renderer now exists
 - A minimal infrastructure template now exists
 - `setup_infra` now returns one generated Terraform file with minimal coverage
-- Service rendering and broader infrastructure coverage remain deferred
+- A minimal service template now exists
+- `deploy_service` now returns one generated Terraform file with minimal coverage
+- Scale, stop, teardown service rendering, and broader infrastructure coverage remain deferred
 - No execution logic yet
     

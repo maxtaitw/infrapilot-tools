@@ -79,6 +79,16 @@ def _resolve_setup_infra_variables(data: WorkflowInput) -> dict[str, object]:
 
 
 def _build_deploy_service_plan(data: WorkflowInput) -> ExecutionPlan:
+    resolved_variables = _resolve_deploy_service_variables(data)
+    service_name = str(resolved_variables["service_name"])
+    notes = [
+        "Generates one minimal service Terraform file for deploy_service; shell command content remains deferred."
+    ]
+    if resolved_variables["service_name_fallback_used"]:
+        notes.append(
+            "deploy_service used project_state.project_name as service_name because entities['service_name'] was not provided."
+        )
+
     return ExecutionPlan(
         intent=data.intent,
         steps=[
@@ -100,11 +110,51 @@ def _build_deploy_service_plan(data: WorkflowInput) -> ExecutionPlan:
             PlanStep(
                 name="apply_service_infrastructure",
                 type="terraform_apply",
-                description="Apply the service workflow placeholder step.",
+                description="Apply the minimal service Terraform workflow step.",
+                generated_files={
+                    f"service/{service_name}/main.tf": render_template(
+                        "service/main.tf.j2",
+                        resolved_variables,
+                    )
+                },
             ),
         ],
-        notes=["Generated files and command content are deferred in this iteration."],
+        notes=notes,
     )
+
+
+def _resolve_deploy_service_variables(data: WorkflowInput) -> dict[str, object]:
+    infrastructure = data.project_state.infrastructure
+    raw_service_name = data.entities.get("service_name")
+    service_name_fallback_used = (
+        raw_service_name is None or not str(raw_service_name).strip()
+    )
+    service_name = (
+        data.project_state.project_name
+        if service_name_fallback_used
+        else str(raw_service_name).strip()
+    )
+
+    return {
+        "service_name": service_name,
+        "service_name_fallback_used": service_name_fallback_used,
+        "region": data.entities.get(
+            "region",
+            data.project_state.region if data.project_state.region else "us-east-1",
+        ),
+        "port": data.entities.get("port", 3000),
+        "cpu": data.entities.get("cpu", 256),
+        "memory": data.entities.get("memory", 512),
+        "replicas": data.entities.get("replicas", 2),
+        "environment_variables": data.entities.get("environment_variables", {}),
+        "image_tag": data.entities.get("image_tag", "latest"),
+        "cluster_arn": infrastructure["cluster_arn"],
+        "vpc_id": infrastructure["vpc_id"],
+        "private_subnet_ids": infrastructure["private_subnet_ids"],
+        "alb_listener_arn": infrastructure["alb_listener_arn"],
+        "ecs_task_security_group_id": infrastructure["ecs_task_security_group_id"],
+        "ecr_url": infrastructure["ecr_url"],
+    }
 
 
 def _build_scale_service_plan(data: WorkflowInput) -> ExecutionPlan:
