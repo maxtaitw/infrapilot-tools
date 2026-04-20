@@ -15,6 +15,7 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - [x] Entity-plus-project-state merge logic exists for `deploy_service`
 - [x] `deploy_service` generates one service Terraform file
 - [x] Narrow deploy-service infrastructure-key validation exists
+- [x] Tracked workflow contract tests exist
 - [ ] Backend integration handoff is not complete yet
 - [ ] Terraform validation for full infra and service templates is not complete yet
 - [ ] Broader infrastructure coverage from the original Week 1 plan is not complete yet
@@ -27,6 +28,7 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - `setup_infra` currently returns one generated file: `infra/main.tf`
 - `deploy_service` currently returns one generated service file: `service/{service_name}/main.tf`
 - Scale, stop, teardown service, and teardown infrastructure still return deterministic placeholder plans without real generated files
+- Tracked tests now cover the current `setup_infra` and `deploy_service` generation contract
 - Remaining Week 2 work should focus on integration handoff and validation readiness, not direct execution
 
 ## Current Input Contract
@@ -152,6 +154,12 @@ Currently included:
 - Complete backend integration handoff so the interpret endpoint can return real execution plans with generated Terraform files
 - Keep shell-command steps as plan steps only unless command-generation scope is explicitly approved
 - Run Terraform validation when the full template shape is ready and Terraform is available
+
+## Current Verification
+
+- Tracked tests live in `InfraPilot/tests/workflow/test_engine.py`
+- Tests use Python `unittest` and do not add new dependencies
+- Current coverage includes `setup_infra` generation, `deploy_service` generation, service-name fallback notes, missing deploy infrastructure validation, and placeholder-only teardown infrastructure behavior
 
 ## How To Use It Now
 
