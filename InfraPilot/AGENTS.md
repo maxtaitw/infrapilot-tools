@@ -110,10 +110,10 @@ This module does not own:
 
 - Documentation, schemas, validation skeleton, and workflow engine skeleton remain the baseline
 - A minimal renderer now exists
-- A minimal infrastructure template now exists
-- `setup_infra` now returns one generated Terraform file with minimal coverage
+- An expanded infrastructure template now exists
+- `setup_infra` now returns one combined generated Terraform file
 - A minimal service template now exists
 - `deploy_service` now returns one generated Terraform file with minimal coverage
-- Scale, stop, teardown service rendering, and broader infrastructure coverage remain deferred
+- Scale, stop, teardown service rendering, Terraform execution, and real AWS validation remain deferred
 - No execution logic yet
     

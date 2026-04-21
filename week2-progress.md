@@ -9,7 +9,7 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - [x] Basic validation exists
 - [x] Deterministic intent dispatch exists
 - [x] Minimal Jinja2 renderer exists
-- [x] Minimal `setup_infra` Terraform generation exists
+- [x] Expanded `setup_infra` Terraform generation exists
 - [x] Minimal ECS service Terraform template exists
 - [x] Minimal service rendering exists for `deploy_service`
 - [x] Entity-plus-project-state merge logic exists for `deploy_service`
@@ -23,7 +23,7 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - [x] Minimal local dependency file exists
 - [ ] Backend integration code is not complete yet
 - [ ] Terraform `fmt` and `validate` are not complete because Terraform is unavailable locally
-- [ ] Broader infrastructure coverage from the original Week 1 plan is not complete yet
+- [ ] Terraform/AWS validation for expanded infrastructure is not complete yet
 
 ## Current Process
 
@@ -137,10 +137,17 @@ Currently included:
 
 - Terraform block with AWS provider requirement
 - `provider "aws"` using the resolved `region`
-- `aws_vpc`
-- `aws_ecs_cluster`
-- `aws_ecr_repository`
-- outputs for `vpc_id`, `ecs_cluster_name`, and `ecr_repository_url`
+- VPC networking
+- public and private subnets across two availability zones
+- internet gateway
+- NAT gateway
+- public and private route tables
+- ALB with default HTTP listener
+- ALB and ECS task security groups
+- ECS cluster with Fargate capacity providers and container insights
+- ECR repository
+- ECS task execution IAM role
+- outputs needed by the service template, including `cluster_arn`, `vpc_id`, `private_subnet_ids`, `alb_listener_arn`, `ecs_task_security_group_id`, and `ecr_url`
 
 Current renderer:
 
@@ -229,7 +236,7 @@ plan = build_execution_plan(
 
 ## Deferred After Current State
 
-- full infrastructure template coverage from the original Week 1 plan
+- Terraform/AWS validation and hardening for the expanded infrastructure template
 - service command generation
 - multi-step setup-then-deploy behavior
 - scale, stop, and teardown service rendering
@@ -240,4 +247,4 @@ plan = build_execution_plan(
 
 ## Summary
 
-Current status: Week 1 produced the workflow contract, basic validation, deterministic dispatch, a minimal renderer, and one generated `setup_infra` Terraform file. Week 2 now adds one generated `deploy_service` Terraform file and narrow deploy infrastructure validation while keeping execution outside the workflow module.
+Current status: Week 1 produced the workflow contract, basic validation, deterministic dispatch, a renderer, and generated `setup_infra` Terraform. Week 2 now has expanded infrastructure generation, one generated `deploy_service` Terraform file, narrow deploy infrastructure validation, and review/integration handoff materials while keeping execution outside the workflow module.

@@ -40,7 +40,7 @@ def _build_setup_infra_plan(data: WorkflowInput) -> ExecutionPlan:
             PlanStep(
                 name="setup_infrastructure",
                 type="terraform_apply",
-                description="Apply the minimal infrastructure workflow step.",
+                description="Apply the infrastructure Terraform workflow step.",
                 generated_files={
                     "infra/main.tf": render_template(
                         "infra/main.tf.j2",
@@ -50,7 +50,7 @@ def _build_setup_infra_plan(data: WorkflowInput) -> ExecutionPlan:
             )
         ],
         notes=[
-            "Generates one minimal Terraform file for setup_infra; broader infrastructure coverage is deferred."
+            "Generates one combined Terraform file for setup_infra; Terraform execution remains deferred."
         ],
     )
 

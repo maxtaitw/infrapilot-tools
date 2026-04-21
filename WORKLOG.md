@@ -15,3 +15,11 @@
 - Deferred Intentionally: Real shell commands, Terraform execution, backend/CLI integration code, broader infrastructure coverage, setup-then-deploy multi-step behavior, scale/stop/teardown rendering, and real AWS validation.
 - Notes: Kept shell steps as placeholders, made `service_name` fallback explicit in plan notes, kept `environment_variables` as a flat dictionary, and kept the handoff docs based only on implemented behavior.
 - Next Step: Decide whether to prepare Terraform validation for the current minimal templates or wait until broader infrastructure coverage is added.
+
+## Week 2 Infrastructure Template Expansion
+
+- Goal: Move `setup_infra` closer to the original Person C infrastructure-template scope while still generating one Terraform file.
+- Completed: Expanded `workflow/templates/infra/main.tf.j2` to include VPC networking, public/private subnets, internet gateway, NAT gateway, route tables, ALB, security groups, ECS cluster capacity providers, ECR repository, ECS task execution role, and fuller outputs.
+- Deferred Intentionally: Terraform execution, real Terraform validation, real AWS validation, template hardening from cloud feedback, backend/CLI execution integration, and remaining workflow rendering.
+- Notes: Kept the existing `WorkflowInput` and `ExecutionPlan` schemas unchanged and continued using only `project_name`, `region`, and `vpc_cidr` for `setup_infra`.
+- Next Step: Run Terraform `fmt` and `validate` once Terraform is available, then fix any syntax or provider-level issues before real AWS testing.

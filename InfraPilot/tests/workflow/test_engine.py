@@ -39,7 +39,7 @@ def project_state_with_infrastructure() -> ProjectState:
 
 
 class BuildExecutionPlanTests(unittest.TestCase):
-    def test_setup_infra_generates_minimal_infra_file(self) -> None:
+    def test_setup_infra_generates_infra_file(self) -> None:
         plan = build_execution_plan(
             WorkflowInput(
                 intent="setup_infra",
@@ -58,9 +58,24 @@ class BuildExecutionPlanTests(unittest.TestCase):
             'provider "aws"',
             'region = "us-east-1"',
             'resource "aws_vpc" "main"',
-            'cidr_block = "10.0.0.0/16"',
+            'cidr_block           = "10.0.0.0/16"',
+            'resource "aws_subnet" "public"',
+            'resource "aws_subnet" "private"',
+            'resource "aws_internet_gateway" "main"',
+            'resource "aws_nat_gateway" "main"',
+            'resource "aws_route_table" "public"',
+            'resource "aws_lb" "main"',
+            'resource "aws_lb_listener" "http"',
+            'resource "aws_security_group" "alb"',
+            'resource "aws_security_group" "ecs_tasks"',
             'resource "aws_ecs_cluster" "main"',
+            'resource "aws_ecs_cluster_capacity_providers" "main"',
             'resource "aws_ecr_repository" "main"',
+            'resource "aws_iam_role" "ecs_task_execution"',
+            'output "private_subnet_ids"',
+            'output "alb_listener_arn"',
+            'output "ecs_task_security_group_id"',
+            'output "ecr_url"',
         ]
         for expected in expected_content:
             self.assertIn(expected, rendered)

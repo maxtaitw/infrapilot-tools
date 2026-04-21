@@ -25,7 +25,7 @@ The workflow module sits between upstream interpretation and downstream executio
 
 ## Current Iteration Scope
 
-This iteration includes concrete schemas, a validation skeleton, a minimal Jinja2 renderer, minimal `setup_infra` file generation, and minimal `deploy_service` service file generation. Execution behavior and broader template coverage remain deferred.
+This iteration includes concrete schemas, a validation skeleton, a minimal Jinja2 renderer, expanded `setup_infra` file generation, and minimal `deploy_service` service file generation. Execution behavior and remaining workflow coverage stay deferred.
 
 ## Planned High-Level Flow
 
@@ -55,7 +55,7 @@ InfraPilot/
 
 - `workflow/` is named by responsibility rather than ownership.
 - `workflow/rendering/renderer.py` provides the minimal template-loading boundary for generated files.
-- `workflow/templates/infra/main.tf.j2` is intentionally limited to one minimal infrastructure file for `setup_infra`.
+- `workflow/templates/infra/main.tf.j2` is one combined infrastructure file for `setup_infra`.
 - `workflow/templates/service/main.tf.j2` is intentionally limited to one minimal service file for `deploy_service`.
 - `schemas/` is reserved for future workflow-facing data contracts once team boundaries are finalized.
 
@@ -79,4 +79,4 @@ python3.13 -m venv .venv
 
 ## Next Steps
 
-Future iterations should expand service rendering beyond `deploy_service` and infrastructure coverage beyond the intentionally minimal `setup_infra` template only when those boundaries are approved.
+Future iterations should validate and harden the infrastructure template, expand service rendering beyond `deploy_service`, and keep execution behavior outside this module unless that boundary is approved.

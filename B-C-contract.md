@@ -106,7 +106,7 @@ Current plan:
 
 - one `terraform_apply` step named `setup_infrastructure`
 - generated file: `infra/main.tf`
-- current Terraform coverage is minimal: AWS provider, VPC, ECS cluster, ECR repository, and outputs
+- current Terraform coverage includes AWS provider, VPC networking, public and private subnets, internet gateway, NAT gateway, route tables, ALB, security groups, ECS cluster, ECR repository, IAM execution role, and outputs needed by the service template
 
 Current variable priority:
 
