@@ -1,0 +1,10 @@
+{
+  "intent": "setup_infra",
+  "entities": {},
+  "project_state": {
+    "project_name": "demo-project",
+    "region": null,
+    "infrastructure": {},
+    "services": {}
+  }
+}

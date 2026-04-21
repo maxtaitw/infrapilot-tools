@@ -1,0 +1,30 @@
+{
+  "intent": "deploy_service",
+  "entities": {
+    "service_name": "api",
+    "port": 3000,
+    "cpu": 256,
+    "memory": 512,
+    "replicas": 2,
+    "image_tag": "v1",
+    "environment_variables": {
+      "NODE_ENV": "production"
+    }
+  },
+  "project_state": {
+    "project_name": "demo-project",
+    "region": "us-east-1",
+    "infrastructure": {
+      "cluster_arn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+      "vpc_id": "vpc-123",
+      "private_subnet_ids": [
+        "subnet-123",
+        "subnet-456"
+      ],
+      "alb_listener_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/demo/1/2",
+      "ecs_task_security_group_id": "sg-123",
+      "ecr_url": "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo"
+    },
+    "services": {}
+  }
+}

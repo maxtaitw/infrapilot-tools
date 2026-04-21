@@ -59,6 +59,17 @@ InfraPilot/
 - `workflow/templates/service/main.tf.j2` is intentionally limited to one minimal service file for `deploy_service`.
 - `schemas/` is reserved for future workflow-facing data contracts once team boundaries are finalized.
 
+## Local Verification Setup
+
+Use Python 3.10+ for local verification. Python 3.13 is the version used for the latest local checks.
+
+```bash
+cd InfraPilot
+python3.13 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m unittest discover -s tests -p "test_*.py"
+```
+
 ## How Teammates Should Use This Repo
 
 - Read `AGENTS.md` first for scope and working rules.

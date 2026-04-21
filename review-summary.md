@@ -1,0 +1,55 @@
+# Review Summary
+
+This summary is for teammate and mentor review of the current Person C workflow/code-generation state.
+
+## What To Review
+
+- `InfraPilot/workflow/engine.py`: current workflow dispatch, minimal `setup_infra` generation, and minimal `deploy_service` generation.
+- `InfraPilot/workflow/validation/basic.py`: current structural validation and required `deploy_service` infrastructure keys.
+- `InfraPilot/workflow/templates/infra/main.tf.j2`: minimal infrastructure Terraform template.
+- `InfraPilot/workflow/templates/service/main.tf.j2`: minimal ECS service Terraform template.
+- `InfraPilot/tests/workflow/test_engine.py`: tracked workflow contract tests.
+- `B-C-contract.md`: current B/C intent/entity contract.
+- `backend-workflow-handoff.md`: backend integration handoff for Person A.
+- `integration-examples/`: JSON input/output-shape examples for backend wiring.
+- `week2-progress.md`: current Week 2 status report.
+
+## How To Verify
+
+From `InfraPilot/`:
+
+```bash
+PYTHONPYCACHEPREFIX=/tmp/pycache .venv/bin/python -m py_compile workflow/engine.py workflow/validation/basic.py workflow/rendering/renderer.py tests/workflow/test_engine.py
+.venv/bin/python -m unittest discover -s tests -p "test_*.py"
+```
+
+Latest local result:
+
+```text
+Ran 5 tests in 0.005s
+OK
+```
+
+JSON examples were validated with:
+
+```bash
+python3 -m json.tool
+```
+
+## Current Status
+
+- `setup_infra` generates one minimal Terraform file: `infra/main.tf`.
+- `deploy_service` generates one minimal Terraform file on its Terraform step: `service/{service_name}/main.tf`.
+- The first three `deploy_service` shell steps remain placeholders.
+- `service_name` falls back to `project_state.project_name` only when missing or blank, and the plan records that fallback in `notes`.
+- Terraform validation readiness rendered files into `/tmp/infrapilot-template-validation`, but `terraform fmt` and `terraform validate` were skipped because Terraform is not installed locally.
+
+## Deferred
+
+- real shell command generation
+- Terraform execution
+- backend and CLI integration code
+- broader infrastructure coverage
+- multi-step setup-then-deploy behavior
+- scale, stop, and teardown service rendering
+- real AWS validation

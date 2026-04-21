@@ -1,37 +1,26 @@
+# B-C Contract
 
-
-# B-C Contract Draft
-
-## Goal
-
-This document defines the current working boundary between:
-
-- the upstream intent/entity layer
-- the workflow module
-
-The goal is to make integration easier and reduce guessing.
-
----
+This document defines the current boundary between Person B's intent/entity layer and Person C's workflow module. It reflects current implemented behavior only.
 
 ## Responsibility Split
 
-### Upstream layer owns
-- understanding natural-language user requests
-- deciding the intent
-- extracting entities
-- sending structured input
+Person B / upstream layer owns:
 
-### Workflow module owns
-- validating structured input
-- combining input with project state
-- deciding the workflow shape
-- returning a deterministic execution plan
+- natural-language interpretation
+- intent selection
+- entity extraction
+- passing structured workflow input
 
----
+Person C / workflow module owns:
 
-## Supported Intents
+- validating structured workflow input
+- combining entities with project state where currently implemented
+- returning deterministic execution plans
+- returning generated Terraform file contents for currently supported generation paths
 
-Current scoped intents:
+## Current Implemented Behavior
+
+Supported intents:
 
 - `setup_infra`
 - `deploy_service`
@@ -40,56 +29,47 @@ Current scoped intents:
 - `teardown_service`
 - `teardown_infra`
 
----
+Currently generated files:
 
-## Input Shape
+- `setup_infra` generates `infra/main.tf`
+- `deploy_service` generates `service/{service_name}/main.tf`
+- `scale_service`, `stop_service`, `teardown_service`, and `teardown_infra` still return placeholder plan steps only
 
-The workflow module expects this structure:
+Current step types:
 
-```json
+- `terraform_apply`
+- `terraform_destroy`
+- `shell_command`
+
+## Current Input Shape
+
+```python
 {
-  "intent": "...",
-  "entities": {},
-  "project_state": {}
+  "intent": "setup_infra | deploy_service | scale_service | stop_service | teardown_service | teardown_infra",
+  "entities": dict[str, object],
+  "project_state": {
+    "project_name": str,
+    "region": str | None,
+    "infrastructure": dict[str, object],
+    "services": dict[str, object],
+  },
 }
 ```
 
-### Current expectations
+## Current Entity Expectations
 
-#### `intent`
-Must be one of the 6 supported intents above.
+General rule:
 
-#### `entities`
-- flat dictionary for now
-- no nested objects unless we explicitly agree later
+- `entities` should be flat
+- `environment_variables` may be a flat dictionary for `deploy_service`
 
-#### `project_state`
-Current minimum shape:
+`setup_infra` currently uses:
 
-```json
-{
-  "project_name": "string",
-  "region": "string or null",
-  "infrastructure": {},
-  "services": {}
-}
-```
-
----
-
-## Suggested Entities by Intent
-
-These are the current suggested fields.
-They are not fully frozen yet, but should be the default direction.
-
-### `setup_infra`
-Possible fields:
 - `region`
-- `cluster_name`
 - `vpc_cidr`
 
-### `deploy_service`
-Possible fields:
+`deploy_service` currently uses:
+
 - `service_name`
 - `port`
 - `cpu`
@@ -98,155 +78,98 @@ Possible fields:
 - `environment_variables`
 - `image_tag`
 
-### `scale_service`
-Possible fields:
-- `service_name`
-- `replicas`
+`scale_service`, `stop_service`, `teardown_service`, and `teardown_infra` do not generate real files yet, so their final entity contracts are still open.
 
-### `stop_service`
-Possible fields:
-- `service_name`
+## Current Workflow Output Shape
 
-### `teardown_service`
-Possible fields:
-- `service_name`
-
-### `teardown_infra`
-- no required fields for now
-
----
-
-## Workflow Module Output
-
-Current output shape:
-
-```json
+```python
 {
-  "intent": "...",
-  "steps": [],
-  "notes": [],
-  "requires_confirmation": true
+  "intent": str,
+  "steps": [
+    {
+      "name": str,
+      "type": "terraform_apply | terraform_destroy | shell_command",
+      "description": str,
+      "generated_files": {str: str},
+    }
+  ],
+  "notes": list[str],
+  "requires_confirmation": True,
 }
 ```
 
-Each step currently looks like:
+`generated_files` is now real for `setup_infra` and the Terraform step of `deploy_service`.
 
-```json
-{
-  "name": "...",
-  "type": "...",
-  "description": "...",
-  "generated_files": {}
-}
-```
+## `setup_infra` Behavior
 
-Current step types:
-- `terraform_apply`
-- `terraform_destroy`
-- `shell_command`
+Current plan:
 
-Important note:
-- `generated_files` is currently only a placeholder
-- real file generation is not implemented yet
+- one `terraform_apply` step named `setup_infrastructure`
+- generated file: `infra/main.tf`
+- current Terraform coverage is minimal: AWS provider, VPC, ECS cluster, ECR repository, and outputs
 
----
+Current variable priority:
 
-## Current Workflow Shapes
+- `project_name`: `project_state.project_name`
+- `region`: `entities["region"]`, then `project_state.region`, then `"us-east-1"`
+- `vpc_cidr`: `entities["vpc_cidr"]`, then `"10.0.0.0/16"`
 
-### `setup_infra`
-- 1 placeholder `terraform_apply` step
+## `deploy_service` Behavior
 
-### `deploy_service`
-- build container image
-- authenticate to ECR
-- push image
-- apply service infrastructure
+Current plan:
 
-### `scale_service`
-- 1 placeholder `terraform_apply` step
+- `build_container_image` shell placeholder step
+- `authenticate_to_ecr` shell placeholder step
+- `push_container_image` shell placeholder step
+- `apply_service_infrastructure` Terraform step with generated service Terraform
 
-### `stop_service`
-- 1 placeholder `terraform_apply` step
+Generated file:
 
-### `teardown_service`
-- 1 placeholder `terraform_destroy` step
+- `service/{service_name}/main.tf`
 
-### `teardown_infra`
-- 1 placeholder `terraform_destroy` step
+Current Terraform coverage is minimal:
 
-These are current placeholder workflow shapes only.
+- CloudWatch log group
+- ALB target group
+- ALB listener rule
+- ECS task definition
+- ECS service
+- service-related outputs
 
----
+Current `service_name` rule:
 
-## What Is Already Stable Enough
+- use `entities["service_name"]` when provided and non-empty
+- otherwise use `project_state.project_name`
+- when fallback is used, the plan includes an explicit note
 
-The following are stable enough to align on now:
+Current required `project_state.infrastructure` keys for `deploy_service`:
 
-- the 6 intent names
-- top-level input shape
-- top-level output shape
-- deterministic workflow dispatch exists
-- `requires_confirmation = true`
+- `cluster_arn`
+- `vpc_id`
+- `private_subnet_ids`
+- `alb_listener_arn`
+- `ecs_task_security_group_id`
+- `ecr_url`
 
----
+## Current Validation Behavior
 
-## Open Questions To Discuss
+The workflow entry point raises `ValueError` when validation fails.
 
-### 1. Missing values
-If a user leaves out values, who should fill them?
+Current validation rules:
 
-Examples:
-- `scale to 5` with no service name
-- `deploy my app` with no cpu/memory/replicas
-- `stop it` with no service name
+- `project_state.project_name` must not be empty
+- `project_state.infrastructure` must be a dictionary
+- `project_state.services` must be a dictionary
+- `entities` must be flat, except `environment_variables` may be a flat dictionary
+- `deploy_service`, `scale_service`, `stop_service`, and `teardown_service` require non-empty `project_state.infrastructure`
+- `deploy_service` requires the six infrastructure keys listed above
 
-Need to decide whether:
-- upstream fills values from context/state
-- workflow module fills values from project state when safe
-- missing values should remain missing and be treated as validation/clarification issues
+Validation messages are joined into one `ValueError` string.
 
-### 2. Multi-step behavior
-Example:
-- user asks for `deploy_service`
-- infrastructure does not exist
+## Open B-C Discussion Items
 
-Need to decide whether:
-- upstream should explicitly signal multi-step behavior
-- workflow module should infer it from `intent + project_state`
-- missing infrastructure should simply be treated as an error
-
-### 3. `environment_variables` shape
-Still needs agreement.
-
-Possible directions:
-- flat dictionary
-- list of key/value pairs
-
-### 4. Future generated files contract
-Likely future direction:
-
-```json
-{
-  "generated_files": {
-    "infra/main.tf": "...",
-    "service/main.tf": "..."
-  }
-}
-```
-
-Still needs confirmation later.
-
----
-
-## Immediate Next Step
-
-Suggested next discussion with B:
-
-1. confirm the 6 intent names
-2. confirm the suggested entity fields
-3. decide:
-   - missing value policy
-   - multi-step policy
-   - `environment_variables` shape
-
-Once those are aligned, integration between the intent/entity layer and the workflow module should be much smoother.
+- Decide how Person B should signal multi-step setup-then-deploy behavior.
+- Decide final defaults and required fields for `scale_service`, `stop_service`, `teardown_service`, and `teardown_infra`.
+- Decide whether Person B or Person C owns stricter normalization for CPU, memory, replicas, ports, and service names.
+- Confirm that `environment_variables` should remain a flat dictionary.
+- Decide whether missing service names for non-deploy service intents should fall back to `project_state.project_name` or produce clarification/validation errors.

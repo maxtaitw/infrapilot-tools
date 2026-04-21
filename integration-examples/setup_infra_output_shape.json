@@ -1,0 +1,17 @@
+{
+  "intent": "setup_infra",
+  "steps": [
+    {
+      "name": "setup_infrastructure",
+      "type": "terraform_apply",
+      "description": "Apply the minimal infrastructure workflow step.",
+      "generated_files": {
+        "infra/main.tf": "<rendered Terraform for VPC, ECS cluster, ECR repository, and outputs>"
+      }
+    }
+  ],
+  "notes": [
+    "Generates one minimal Terraform file for setup_infra; broader infrastructure coverage is deferred."
+  ],
+  "requires_confirmation": true
+}
