@@ -19,11 +19,13 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - [x] Backend integration handoff document exists
 - [x] Backend integration JSON examples exist
 - [x] Terraform validation readiness check rendered current templates locally
+- [x] Terraform installed locally for validation
+- [x] Rendered Terraform files pass `terraform fmt -check`
+- [x] Rendered Terraform files pass `terraform init -backend=false` and `terraform validate`
 - [x] Review summary exists for teammate and mentor review
 - [x] Minimal local dependency file exists
 - [ ] Backend integration code is not complete yet
-- [ ] Terraform `fmt` and `validate` are not complete because Terraform is unavailable locally
-- [ ] Terraform/AWS validation for expanded infrastructure is not complete yet
+- [ ] Real AWS account validation for expanded infrastructure is not complete yet
 
 ## Current Process
 
@@ -37,9 +39,11 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - Backend integration handoff is documented in `backend-workflow-handoff.md`
 - Backend integration JSON examples live in `integration-examples/`
 - Terraform validation readiness check rendered current templates to `/tmp/infrapilot-template-validation`
+- Terraform CLI is installed locally as `v1.14.9`
+- Rendered infra and service Terraform both pass `fmt`, `init`, and `validate`
 - Review summary is available in `review-summary.md`
 - Local dependency setup is tracked in `InfraPilot/requirements.txt`
-- Remaining Week 2 work should focus on integration code handoff and validation readiness, not direct execution
+- Remaining Week 2 work should focus on backend integration handoff and real cloud validation planning, not direct execution
 
 ## Current Input Contract
 
@@ -170,7 +174,7 @@ Currently included:
 
 - Coordinate backend integration code so the interpret endpoint can return real execution plans with generated Terraform files
 - Keep shell-command steps as plan steps only unless command-generation scope is explicitly approved
-- Run Terraform `fmt -check` and `validate` when Terraform is available
+- Keep Terraform validation command-based unless real execution scope is explicitly approved
 
 ## Current Verification
 
@@ -180,7 +184,9 @@ Currently included:
 - Backend handoff documentation lives in `backend-workflow-handoff.md`
 - Backend integration examples live in `integration-examples/`
 - Rendered current `setup_infra` and `deploy_service` templates into `/tmp/infrapilot-template-validation`
-- Terraform `fmt` and `validate` were skipped because `terraform` is not installed in the current local environment
+- Terraform CLI is installed locally as `v1.14.9`
+- Rendered infra and service Terraform passed `terraform fmt -check`
+- Rendered infra and service Terraform passed `terraform init -backend=false` and `terraform validate`
 - Review summary for teammates and mentor lives in `review-summary.md`
 - Local verification dependencies are tracked in `InfraPilot/requirements.txt`
 
@@ -236,7 +242,7 @@ plan = build_execution_plan(
 
 ## Deferred After Current State
 
-- Terraform/AWS validation and hardening for the expanded infrastructure template
+- Real AWS account validation and hardening for the expanded infrastructure template
 - service command generation
 - multi-step setup-then-deploy behavior
 - scale, stop, and teardown service rendering
