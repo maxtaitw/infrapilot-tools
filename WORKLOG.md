@@ -23,3 +23,19 @@
 - Deferred Intentionally: Terraform execution, real AWS validation, template hardening from cloud feedback, backend/CLI execution integration, and remaining workflow rendering.
 - Notes: Kept the existing `WorkflowInput` and `ExecutionPlan` schemas unchanged and continued using only `project_name`, `region`, and `vpc_cidr` for `setup_infra`. Terraform CLI is now installed locally and rendered infra/service templates pass `fmt`, `init`, and `validate`.
 - Next Step: Coordinate backend integration or plan real AWS validation with approved credentials and execution boundaries.
+
+## Week 2 Backend Integration Discovery
+
+- Goal: Check whether the workflow module can be wired into Person A's backend in this checkout.
+- Completed: Inspected the repository for backend app, API route, and workflow integration files.
+- Deferred Intentionally: Backend scaffold creation, route implementation, persistence, and execution behavior.
+- Notes: No backend source files are present in this checkout, so there is no safe integration point to edit yet.
+- Next Step: Bring Person A's backend source into the shared checkout, then wire the existing `build_execution_plan(...)` entry point into the agreed route.
+
+## Week 2 `teardown_infra` Generation
+
+- Goal: Give infrastructure teardown the same generated Terraform input as setup while keeping execution outside the workflow module.
+- Completed: Wired `teardown_infra` to return one `terraform_destroy` step with `infra/main.tf`, reused the existing setup-infra variable resolver and infra template, updated contract tests, and refreshed Week 2 status.
+- Deferred Intentionally: Terraform destroy execution, state management, AWS credential handling, backend routing, and service teardown rendering.
+- Notes: This prepares destroy-plan file content only; it does not run Terraform or decide how state is stored.
+- Next Step: Wait for backend source files or choose the next service lifecycle intent after deciding whether it should be Terraform-driven or command/API-driven.

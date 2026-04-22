@@ -33,7 +33,8 @@ Currently generated files:
 
 - `setup_infra` generates `infra/main.tf`
 - `deploy_service` generates `service/{service_name}/main.tf`
-- `scale_service`, `stop_service`, `teardown_service`, and `teardown_infra` still return placeholder plan steps only
+- `teardown_infra` generates `infra/main.tf`
+- `scale_service`, `stop_service`, and `teardown_service` still return placeholder plan steps only
 
 Current step types:
 
@@ -78,7 +79,9 @@ General rule:
 - `environment_variables`
 - `image_tag`
 
-`scale_service`, `stop_service`, `teardown_service`, and `teardown_infra` do not generate real files yet, so their final entity contracts are still open.
+`teardown_infra` uses the same currently supported entities as `setup_infra`.
+
+`scale_service`, `stop_service`, and `teardown_service` do not generate real files yet, so their final entity contracts are still open.
 
 ## Current Workflow Output Shape
 
@@ -98,7 +101,7 @@ General rule:
 }
 ```
 
-`generated_files` is now real for `setup_infra` and the Terraform step of `deploy_service`.
+`generated_files` is now real for `setup_infra`, `teardown_infra`, and the Terraform step of `deploy_service`.
 
 ## `setup_infra` Behavior
 
@@ -113,6 +116,15 @@ Current variable priority:
 - `project_name`: `project_state.project_name`
 - `region`: `entities["region"]`, then `project_state.region`, then `"us-east-1"`
 - `vpc_cidr`: `entities["vpc_cidr"]`, then `"10.0.0.0/16"`
+
+## `teardown_infra` Behavior
+
+Current plan:
+
+- one `terraform_destroy` step named `teardown_infrastructure`
+- generated file: `infra/main.tf`
+- uses the same infrastructure template and variable priority as `setup_infra`
+- prepares Terraform destroy input only; Terraform execution remains outside the workflow module
 
 ## `deploy_service` Behavior
 
@@ -169,7 +181,7 @@ Validation messages are joined into one `ValueError` string.
 ## Open B-C Discussion Items
 
 - Decide how Person B should signal multi-step setup-then-deploy behavior.
-- Decide final defaults and required fields for `scale_service`, `stop_service`, `teardown_service`, and `teardown_infra`.
+- Decide final defaults and required fields for `scale_service`, `stop_service`, and `teardown_service`.
 - Decide whether Person B or Person C owns stricter normalization for CPU, memory, replicas, ports, and service names.
 - Confirm that `environment_variables` should remain a flat dictionary.
 - Decide whether missing service names for non-deploy service intents should fall back to `project_state.project_name` or produce clarification/validation errors.

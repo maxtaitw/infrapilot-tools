@@ -27,6 +27,9 @@ terraform -chdir=/tmp/infrapilot-template-validation/infra validate
 terraform -chdir=/tmp/infrapilot-template-validation/service/api fmt -check -diff
 terraform -chdir=/tmp/infrapilot-template-validation/service/api init -backend=false
 terraform -chdir=/tmp/infrapilot-template-validation/service/api validate
+terraform -chdir=/tmp/infrapilot-template-validation/teardown-infra fmt -check -diff
+terraform -chdir=/tmp/infrapilot-template-validation/teardown-infra init -backend=false
+terraform -chdir=/tmp/infrapilot-template-validation/teardown-infra validate
 ```
 
 Latest local result:
@@ -46,6 +49,7 @@ python3 -m json.tool
 
 - `setup_infra` generates one combined Terraform file: `infra/main.tf`.
 - `deploy_service` generates one minimal Terraform file on its Terraform step: `service/{service_name}/main.tf`.
+- `teardown_infra` generates one combined Terraform file on its destroy step: `infra/main.tf`.
 - The first three `deploy_service` shell steps remain placeholders.
 - `service_name` falls back to `project_state.project_name` only when missing or blank, and the plan records that fallback in `notes`.
 - Terraform `v1.14.9` is installed locally.

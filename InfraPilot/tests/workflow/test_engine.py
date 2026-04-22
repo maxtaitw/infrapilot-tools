@@ -163,7 +163,7 @@ class BuildExecutionPlanTests(unittest.TestCase):
             any("project_state.project_name as service_name" in note for note in plan.notes)
         )
 
-    def test_teardown_infra_remains_placeholder_only(self) -> None:
+    def test_teardown_infra_generates_destroy_infra_file(self) -> None:
         plan = build_execution_plan(
             WorkflowInput(
                 intent="teardown_infra",
@@ -173,8 +173,24 @@ class BuildExecutionPlanTests(unittest.TestCase):
 
         self.assertEqual("teardown_infra", plan.intent)
         self.assertEqual(1, len(plan.steps))
-        self.assertEqual("terraform_destroy", plan.steps[0].type)
-        self.assertEqual({}, plan.steps[0].generated_files)
+        step = plan.steps[0]
+        self.assertEqual("terraform_destroy", step.type)
+        self.assertIn("infra/main.tf", step.generated_files)
+        self.assertTrue(
+            any("Terraform destroy execution remains deferred" in note for note in plan.notes)
+        )
+
+        rendered = step.generated_files["infra/main.tf"]
+        expected_content = [
+            'provider "aws"',
+            'region = "us-east-1"',
+            'resource "aws_vpc" "main"',
+            'cidr_block           = "10.0.0.0/16"',
+            'resource "aws_ecs_cluster" "main"',
+            'resource "aws_ecr_repository" "main"',
+        ]
+        for expected in expected_content:
+            self.assertIn(expected, rendered)
 
 
 if __name__ == "__main__":

@@ -22,9 +22,11 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - [x] Terraform installed locally for validation
 - [x] Rendered Terraform files pass `terraform fmt -check`
 - [x] Rendered Terraform files pass `terraform init -backend=false` and `terraform validate`
+- [x] `teardown_infra` generates one infrastructure Terraform file for destroy planning
 - [x] Review summary exists for teammate and mentor review
 - [x] Minimal local dependency file exists
 - [ ] Backend integration code is not complete yet
+- [ ] Backend source files are not present in this checkout
 - [ ] Real AWS account validation for expanded infrastructure is not complete yet
 
 ## Current Process
@@ -34,8 +36,9 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - The renderer can render templates from `InfraPilot/workflow/templates`
 - `setup_infra` currently returns one generated file: `infra/main.tf`
 - `deploy_service` currently returns one generated service file: `service/{service_name}/main.tf`
-- Scale, stop, teardown service, and teardown infrastructure still return deterministic placeholder plans without real generated files
-- Tracked tests now cover the current `setup_infra` and `deploy_service` generation contract
+- `teardown_infra` currently returns one generated file: `infra/main.tf`
+- Scale, stop, and teardown service still return deterministic placeholder plans without real generated files
+- Tracked tests now cover the current `setup_infra`, `deploy_service`, and `teardown_infra` generation contract
 - Backend integration handoff is documented in `backend-workflow-handoff.md`
 - Backend integration JSON examples live in `integration-examples/`
 - Terraform validation readiness check rendered current templates to `/tmp/infrapilot-template-validation`
@@ -43,6 +46,7 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - Rendered infra and service Terraform both pass `fmt`, `init`, and `validate`
 - Review summary is available in `review-summary.md`
 - Local dependency setup is tracked in `InfraPilot/requirements.txt`
+- Backend integration is blocked in this checkout because no backend app, route, or API package is present
 - Remaining Week 2 work should focus on backend integration handoff and real cloud validation planning, not direct execution
 
 ## Current Input Contract
@@ -124,7 +128,7 @@ Current behavior by intent:
 - `scale_service` returns one placeholder `terraform_apply` step
 - `stop_service` returns one placeholder `terraform_apply` step
 - `teardown_service` returns one placeholder `terraform_destroy` step
-- `teardown_infra` returns one placeholder `terraform_destroy` step
+- `teardown_infra` returns one `terraform_destroy` step and generates `infra/main.tf`
 
 Current Week 2 output direction:
 
@@ -135,7 +139,7 @@ Current Week 2 output direction:
 
 ## What Exists Now
 
-Current generated infrastructure file: `infra/main.tf`
+Current generated infrastructure file for `setup_infra` and `teardown_infra`: `infra/main.tf`
 
 Currently included:
 
@@ -173,6 +177,7 @@ Currently included:
 ## Week 2 Planned Work
 
 - Coordinate backend integration code so the interpret endpoint can return real execution plans with generated Terraform files
+- Bring Person A's backend source files into the shared checkout before wiring the workflow call
 - Keep shell-command steps as plan steps only unless command-generation scope is explicitly approved
 - Keep Terraform validation command-based unless real execution scope is explicitly approved
 
@@ -180,13 +185,13 @@ Currently included:
 
 - Tracked tests live in `InfraPilot/tests/workflow/test_engine.py`
 - Tests use Python `unittest` and do not add new dependencies
-- Current coverage includes `setup_infra` generation, `deploy_service` generation, service-name fallback notes, missing deploy infrastructure validation, and placeholder-only teardown infrastructure behavior
+- Current coverage includes `setup_infra` generation, `deploy_service` generation, `teardown_infra` generation, service-name fallback notes, and missing deploy infrastructure validation
 - Backend handoff documentation lives in `backend-workflow-handoff.md`
 - Backend integration examples live in `integration-examples/`
-- Rendered current `setup_infra` and `deploy_service` templates into `/tmp/infrapilot-template-validation`
+- Rendered current `setup_infra`, `deploy_service`, and `teardown_infra` templates into `/tmp/infrapilot-template-validation`
 - Terraform CLI is installed locally as `v1.14.9`
-- Rendered infra and service Terraform passed `terraform fmt -check`
-- Rendered infra and service Terraform passed `terraform init -backend=false` and `terraform validate`
+- Rendered infra, service, and teardown-infra Terraform passed `terraform fmt -check`
+- Rendered infra, service, and teardown-infra Terraform passed `terraform init -backend=false` and `terraform validate`
 - Review summary for teammates and mentor lives in `review-summary.md`
 - Local verification dependencies are tracked in `InfraPilot/requirements.txt`
 
@@ -197,8 +202,9 @@ Currently included:
 - Read `plan.steps[0].generated_files["infra/main.tf"]` for current infrastructure Terraform content
 - Use `deploy_service` when you need the one currently generated service Terraform file
 - Read the Terraform step's `generated_files["service/{service_name}/main.tf"]` for current service Terraform content
+- Use `teardown_infra` when you need the current infrastructure Terraform file attached to a destroy plan
 - Provide the required infrastructure keys when testing `deploy_service`
-- Use scale, stop, and teardown intents only to inspect placeholder plan structure for now
+- Use scale, stop, and teardown service intents only to inspect placeholder plan structure for now
 - Do not expect this module to run Terraform, Docker, AWS CLI, or backend calls
 
 Minimal current `setup_infra` example:
@@ -253,4 +259,4 @@ plan = build_execution_plan(
 
 ## Summary
 
-Current status: Week 1 produced the workflow contract, basic validation, deterministic dispatch, a renderer, and generated `setup_infra` Terraform. Week 2 now has expanded infrastructure generation, one generated `deploy_service` Terraform file, narrow deploy infrastructure validation, and review/integration handoff materials while keeping execution outside the workflow module.
+Current status: Week 1 produced the workflow contract, basic validation, deterministic dispatch, a renderer, and generated `setup_infra` Terraform. Week 2 now has expanded infrastructure generation, one generated `deploy_service` Terraform file, generated `teardown_infra` destroy-plan input, narrow deploy infrastructure validation, and review/integration handoff materials while keeping execution outside the workflow module.

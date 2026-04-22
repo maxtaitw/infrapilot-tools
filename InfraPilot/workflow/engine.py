@@ -200,14 +200,24 @@ def _build_teardown_service_plan(data: WorkflowInput) -> ExecutionPlan:
 
 
 def _build_teardown_infra_plan(data: WorkflowInput) -> ExecutionPlan:
+    resolved_variables = _resolve_setup_infra_variables(data)
+
     return ExecutionPlan(
         intent=data.intent,
         steps=[
             PlanStep(
                 name="teardown_infrastructure",
                 type="terraform_destroy",
-                description="Destroy the infrastructure workflow placeholder step.",
+                description="Destroy the infrastructure Terraform workflow step.",
+                generated_files={
+                    "infra/main.tf": render_template(
+                        "infra/main.tf.j2",
+                        resolved_variables,
+                    )
+                },
             )
         ],
-        notes=["Generated files are deferred in this iteration."],
+        notes=[
+            "Generates one combined Terraform file for teardown_infra; Terraform destroy execution remains deferred."
+        ],
     )
