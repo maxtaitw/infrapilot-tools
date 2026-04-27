@@ -38,6 +38,35 @@ def project_state_with_infrastructure() -> ProjectState:
     )
 
 
+def sample_service_state() -> dict[str, object]:
+    return {
+        "port": 3000,
+        "cpu": 256,
+        "memory": 512,
+        "replicas": 2,
+        "image_tag": "v1",
+        "environment_variables": {"NODE_ENV": "production"},
+    }
+
+
+def project_state_with_service() -> ProjectState:
+    return ProjectState(
+        project_name="demo-project",
+        region="us-east-1",
+        infrastructure=sample_infrastructure(),
+        services={"api": sample_service_state(), "demo-project": sample_service_state()},
+    )
+
+
+def project_state_with_sparse_service() -> ProjectState:
+    return ProjectState(
+        project_name="demo-project",
+        region="us-east-1",
+        infrastructure=sample_infrastructure(),
+        services={"api": {}},
+    )
+
+
 class BuildExecutionPlanTests(unittest.TestCase):
     def test_setup_infra_generates_infra_file(self) -> None:
         plan = build_execution_plan(
@@ -161,6 +190,140 @@ class BuildExecutionPlanTests(unittest.TestCase):
         self.assertIn("service/demo-project/main.tf", plan.steps[3].generated_files)
         self.assertTrue(
             any("project_state.project_name as service_name" in note for note in plan.notes)
+        )
+
+    def test_scale_service_generates_service_file(self) -> None:
+        plan = build_execution_plan(
+            WorkflowInput(
+                intent="scale_service",
+                entities={"service_name": "api", "replicas": 4},
+                project_state=project_state_with_service(),
+            )
+        )
+
+        self.assertEqual("scale_service", plan.intent)
+        self.assertEqual(1, len(plan.steps))
+        step = plan.steps[0]
+        self.assertEqual("terraform_apply", step.type)
+        self.assertIn("service/api/main.tf", step.generated_files)
+        rendered = step.generated_files["service/api/main.tf"]
+        expected_content = [
+            'resource "aws_ecs_service" "main"',
+            "desired_count   = 4",
+            "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo:v1",
+            "NODE_ENV",
+        ]
+        for expected in expected_content:
+            self.assertIn(expected, rendered)
+
+    def test_scale_service_requires_replicas(self) -> None:
+        with self.assertRaises(ValueError) as context:
+            build_execution_plan(
+                WorkflowInput(
+                    intent="scale_service",
+                    entities={"service_name": "api"},
+                    project_state=project_state_with_service(),
+                )
+            )
+
+        self.assertIn("entities['replicas']", str(context.exception))
+
+    def test_stop_service_generates_service_file_with_zero_replicas(self) -> None:
+        plan = build_execution_plan(
+            WorkflowInput(
+                intent="stop_service",
+                entities={"service_name": "api"},
+                project_state=project_state_with_service(),
+            )
+        )
+
+        self.assertEqual("stop_service", plan.intent)
+        self.assertEqual(1, len(plan.steps))
+        step = plan.steps[0]
+        self.assertEqual("terraform_apply", step.type)
+        self.assertIn("service/api/main.tf", step.generated_files)
+        rendered = step.generated_files["service/api/main.tf"]
+        self.assertIn("desired_count   = 0", rendered)
+
+    def test_stop_service_requires_explicit_service_name(self) -> None:
+        with self.assertRaises(ValueError) as context:
+            build_execution_plan(
+                WorkflowInput(
+                    intent="stop_service",
+                    entities={},
+                    project_state=project_state_with_service(),
+                )
+            )
+
+        self.assertIn("intent 'stop_service' requires entities['service_name']", str(context.exception))
+
+    def test_stop_service_requires_stored_service_state(self) -> None:
+        with self.assertRaises(ValueError) as context:
+            build_execution_plan(
+                WorkflowInput(
+                    intent="stop_service",
+                    entities={"service_name": "api"},
+                    project_state=project_state_with_infrastructure(),
+                )
+            )
+
+        self.assertIn("project_state.services['api']", str(context.exception))
+
+    def test_teardown_service_generates_destroy_service_file(self) -> None:
+        plan = build_execution_plan(
+            WorkflowInput(
+                intent="teardown_service",
+                entities={"service_name": "api"},
+                project_state=project_state_with_service(),
+            )
+        )
+
+        self.assertEqual("teardown_service", plan.intent)
+        self.assertEqual(1, len(plan.steps))
+        step = plan.steps[0]
+        self.assertEqual("terraform_destroy", step.type)
+        self.assertIn("service/api/main.tf", step.generated_files)
+        self.assertTrue(
+            any("Terraform destroy execution remains deferred" in note for note in plan.notes)
+        )
+        rendered = step.generated_files["service/api/main.tf"]
+        expected_content = [
+            'resource "aws_lb_target_group" "main"',
+            'resource "aws_ecs_task_definition" "main"',
+            'resource "aws_ecs_service" "main"',
+        ]
+        for expected in expected_content:
+            self.assertIn(expected, rendered)
+
+    def test_teardown_service_requires_explicit_service_name(self) -> None:
+        with self.assertRaises(ValueError) as context:
+            build_execution_plan(
+                WorkflowInput(
+                    intent="teardown_service",
+                    entities={},
+                    project_state=project_state_with_service(),
+                )
+            )
+
+        self.assertIn(
+            "intent 'teardown_service' requires entities['service_name']",
+            str(context.exception),
+        )
+
+    def test_teardown_service_uses_defaults_for_sparse_service_state(self) -> None:
+        plan = build_execution_plan(
+            WorkflowInput(
+                intent="teardown_service",
+                entities={"service_name": "api"},
+                project_state=project_state_with_sparse_service(),
+            )
+        )
+
+        rendered = plan.steps[0].generated_files["service/api/main.tf"]
+        self.assertIn('resource "aws_ecs_service" "main"', rendered)
+        self.assertIn("desired_count   = 1", rendered)
+        self.assertTrue(
+            any("filled missing stored service fields with deterministic defaults" in note for note in plan.notes)
         )
 
     def test_teardown_infra_generates_destroy_infra_file(self) -> None:

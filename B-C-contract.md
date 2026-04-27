@@ -33,8 +33,10 @@ Currently generated files:
 
 - `setup_infra` generates `infra/main.tf`
 - `deploy_service` generates `service/{service_name}/main.tf`
+- `scale_service` generates `service/{service_name}/main.tf`
+- `stop_service` generates `service/{service_name}/main.tf`
+- `teardown_service` generates `service/{service_name}/main.tf`
 - `teardown_infra` generates `infra/main.tf`
-- `scale_service`, `stop_service`, and `teardown_service` still return placeholder plan steps only
 
 Current step types:
 
@@ -79,9 +81,32 @@ General rule:
 - `environment_variables`
 - `image_tag`
 
+`scale_service` currently uses:
+
+- `service_name`
+- `replicas`
+
+`stop_service` currently uses:
+
+- `service_name`
+
+`teardown_service` currently uses:
+
+- `service_name`
+
 `teardown_infra` uses the same currently supported entities as `setup_infra`.
 
-`scale_service`, `stop_service`, and `teardown_service` do not generate real files yet, so their final entity contracts are still open.
+`scale_service` currently requires `project_state.services[service_name]` with:
+
+- `port`
+- `cpu`
+- `memory`
+- `image_tag`
+- optional `environment_variables` as a flat dictionary
+
+`stop_service` currently requires the same stored service-state contract as `scale_service`.
+
+`teardown_service` currently requires only that `project_state.services[service_name]` exists as a dictionary. Missing deploy-time fields currently fall back to deterministic defaults during destroy planning.
 
 ## Current Workflow Output Shape
 
@@ -101,7 +126,7 @@ General rule:
 }
 ```
 
-`generated_files` is now real for `setup_infra`, `teardown_infra`, and the Terraform step of `deploy_service`.
+`generated_files` is now real for `setup_infra`, `teardown_infra`, `scale_service`, `stop_service`, `teardown_service`, and the Terraform step of `deploy_service`.
 
 ## `setup_infra` Behavior
 
@@ -163,6 +188,52 @@ Current required `project_state.infrastructure` keys for `deploy_service`:
 - `ecs_task_security_group_id`
 - `ecr_url`
 
+## `scale_service` Behavior
+
+Current plan:
+
+- one `terraform_apply` step named `scale_service`
+- generated file: `service/{service_name}/main.tf`
+- reuses the existing service Terraform template and stored service state
+- updates `desired_count` using `entities["replicas"]`
+- prepares Terraform apply input only; Terraform execution remains outside the workflow module
+
+Current `service_name` rule:
+
+- require `entities["service_name"]` explicitly
+- do not fall back to `project_state.project_name`
+
+## `stop_service` Behavior
+
+Current plan:
+
+- one `terraform_apply` step named `stop_service`
+- generated file: `service/{service_name}/main.tf`
+- reuses the existing service Terraform template and stored service state
+- forces `desired_count` to `0`
+- prepares Terraform apply input only; Terraform execution remains outside the workflow module
+
+Current `service_name` rule:
+
+- use `entities["service_name"]` when provided and non-empty
+- otherwise use `project_state.project_name`
+- when fallback is used, the plan includes an explicit note
+
+## `teardown_service` Behavior
+
+Current plan:
+
+- one `terraform_destroy` step named `teardown_service`
+- generated file: `service/{service_name}/main.tf`
+- reuses the existing service Terraform template
+- uses deterministic defaults for omitted deploy-time fields in stored service state
+- prepares Terraform destroy input only; Terraform execution remains outside the workflow module
+
+Current `service_name` rule:
+
+- require `entities["service_name"]` explicitly
+- do not fall back to `project_state.project_name`
+
 ## Current Validation Behavior
 
 The workflow entry point raises `ValueError` when validation fails.
@@ -175,13 +246,17 @@ Current validation rules:
 - `entities` must be flat, except `environment_variables` may be a flat dictionary
 - `deploy_service`, `scale_service`, `stop_service`, and `teardown_service` require non-empty `project_state.infrastructure`
 - `deploy_service` requires the six infrastructure keys listed above
+- `scale_service`, `stop_service`, and `teardown_service` currently require the same six infrastructure keys because they reuse the service Terraform template
+- `scale_service`, `stop_service`, and `teardown_service` require `project_state.services[service_name]`
+- `scale_service` and `stop_service` require `project_state.services[service_name]` keys `port`, `cpu`, `memory`, and `image_tag`
+- `stop_service` and `teardown_service` require explicit `entities["service_name"]`
+- `scale_service` requires `entities["replicas"]` as an integer greater than or equal to `1`
 
 Validation messages are joined into one `ValueError` string.
 
 ## Open B-C Discussion Items
 
 - Decide how Person B should signal multi-step setup-then-deploy behavior.
-- Decide final defaults and required fields for `scale_service`, `stop_service`, and `teardown_service`.
 - Decide whether Person B or Person C owns stricter normalization for CPU, memory, replicas, ports, and service names.
 - Confirm that `environment_variables` should remain a flat dictionary.
-- Decide whether missing service names for non-deploy service intents should fall back to `project_state.project_name` or produce clarification/validation errors.
+- Decide whether `scale_service` should keep its current fallback-to-`project_state.project_name` behavior, or whether it should also require explicit clarification like `stop_service` and `teardown_service`.

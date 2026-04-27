@@ -14,6 +14,9 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - [x] Minimal service rendering exists for `deploy_service`
 - [x] Entity-plus-project-state merge logic exists for `deploy_service`
 - [x] `deploy_service` generates one service Terraform file
+- [x] `scale_service` generates one service Terraform file
+- [x] `stop_service` generates one service Terraform file
+- [x] `teardown_service` generates one service Terraform file
 - [x] Narrow deploy-service infrastructure-key validation exists
 - [x] Tracked workflow contract tests exist
 - [x] Backend integration handoff document exists
@@ -36,14 +39,16 @@ This report summarizes the current state of the workflow module for Week 2. It i
 - The renderer can render templates from `InfraPilot/workflow/templates`
 - `setup_infra` currently returns one generated file: `infra/main.tf`
 - `deploy_service` currently returns one generated service file: `service/{service_name}/main.tf`
+- `scale_service` currently returns one generated service file: `service/{service_name}/main.tf`
+- `stop_service` currently returns one generated service file: `service/{service_name}/main.tf`
+- `teardown_service` currently returns one generated service file: `service/{service_name}/main.tf`
 - `teardown_infra` currently returns one generated file: `infra/main.tf`
-- Scale, stop, and teardown service still return deterministic placeholder plans without real generated files
-- Tracked tests now cover the current `setup_infra`, `deploy_service`, and `teardown_infra` generation contract
+- Tracked tests now cover the current `setup_infra`, `deploy_service`, `scale_service`, `stop_service`, `teardown_service`, and `teardown_infra` generation contract
 - Backend integration handoff is documented in `backend-workflow-handoff.md`
 - Backend integration JSON examples live in `integration-examples/`
 - Terraform validation readiness check rendered current templates to `/tmp/infrapilot-template-validation`
 - Terraform CLI is installed locally as `v1.14.9`
-- Rendered infra and service Terraform both pass `fmt`, `init`, and `validate`
+- Rendered infra, service, scale-service, stop-service, teardown-service, and teardown-infra Terraform all pass `fmt`, `init`, and `validate`
 - Review summary is available in `review-summary.md`
 - Local dependency setup is tracked in `InfraPilot/requirements.txt`
 - Backend integration is blocked in this checkout because no backend app, route, or API package is present
@@ -75,6 +80,10 @@ Current validation rules:
 - `entities.environment_variables` may be a flat dictionary for `deploy_service`
 - `deploy_service`, `scale_service`, `stop_service`, and `teardown_service` currently require non-empty `project_state.infrastructure`
 - `deploy_service` requires `cluster_arn`, `vpc_id`, `private_subnet_ids`, `alb_listener_arn`, `ecs_task_security_group_id`, and `ecr_url` in `project_state.infrastructure`
+- `scale_service`, `stop_service`, and `teardown_service` currently require the same infrastructure keys because they reuse the service Terraform template
+- `scale_service`, `stop_service`, and `teardown_service` currently require `project_state.services[service_name]`
+- `scale_service`, `stop_service`, and `teardown_service` currently require stored service keys `port`, `cpu`, `memory`, `replicas`, and `image_tag`
+- `scale_service` requires `entities["replicas"]` as an integer greater than or equal to `1`
 
 Current `setup_infra` variables:
 
@@ -101,6 +110,46 @@ Current `deploy_service` variables from `project_state.infrastructure`:
 - `ecs_task_security_group_id`
 - `ecr_url`
 
+Current `scale_service` variables from `entities`:
+
+- `service_name`
+- `replicas`
+
+Current `scale_service` variables from `project_state.services[service_name]`:
+
+- `port`
+- `cpu`
+- `memory`
+- `replicas`
+- `image_tag`
+- optional `environment_variables`
+
+Current `stop_service` variables from `entities`:
+
+- `service_name`
+
+Current `stop_service` variables from `project_state.services[service_name]`:
+
+- `port`
+- `cpu`
+- `memory`
+- `replicas`
+- `image_tag`
+- optional `environment_variables`
+
+Current `teardown_service` variables from `entities`:
+
+- `service_name`
+
+Current `teardown_service` variables from `project_state.services[service_name]`:
+
+- `port`
+- `cpu`
+- `memory`
+- `replicas`
+- `image_tag`
+- optional `environment_variables`
+
 ## Current Output Contract
 
 The engine returns `ExecutionPlan`:
@@ -125,14 +174,17 @@ Current behavior by intent:
 
 - `setup_infra` returns one `terraform_apply` step and generates `infra/main.tf`
 - `deploy_service` returns four steps; the three shell steps remain placeholders and the Terraform step generates `service/{service_name}/main.tf`
-- `scale_service` returns one placeholder `terraform_apply` step
-- `stop_service` returns one placeholder `terraform_apply` step
-- `teardown_service` returns one placeholder `terraform_destroy` step
+- `scale_service` returns one `terraform_apply` step and generates `service/{service_name}/main.tf`
+- `stop_service` returns one `terraform_apply` step and generates `service/{service_name}/main.tf`
+- `teardown_service` returns one `terraform_destroy` step and generates `service/{service_name}/main.tf`
 - `teardown_infra` returns one `terraform_destroy` step and generates `infra/main.tf`
 
 Current Week 2 output direction:
 
 - `deploy_service` returns one generated service Terraform file
+- `scale_service` returns one generated service Terraform file
+- `stop_service` returns one generated service Terraform file
+- `teardown_service` returns one generated service Terraform file
 - service Terraform files use `service/{service_name}/main.tf`
 - `generated_files` should remain a dictionary of file path to file content
 - execution should remain outside this module
@@ -173,6 +225,9 @@ Currently included:
 - ECS task definition
 - ECS service
 - outputs for service name, target group ARN, and log group name
+- `scale_service` reuses the same service template with a new desired replica count
+- `stop_service` reuses the same service template with `desired_count = 0`
+- `teardown_service` reuses the same service template as destroy input
 
 ## Week 2 Planned Work
 
@@ -185,13 +240,14 @@ Currently included:
 
 - Tracked tests live in `InfraPilot/tests/workflow/test_engine.py`
 - Tests use Python `unittest` and do not add new dependencies
-- Current coverage includes `setup_infra` generation, `deploy_service` generation, `teardown_infra` generation, service-name fallback notes, and missing deploy infrastructure validation
+- Current coverage includes `setup_infra` generation, `deploy_service` generation, `scale_service` generation, `stop_service` generation, `teardown_service` generation, `teardown_infra` generation, service-name fallback notes, and missing service validation
 - Backend handoff documentation lives in `backend-workflow-handoff.md`
 - Backend integration examples live in `integration-examples/`
-- Rendered current `setup_infra`, `deploy_service`, and `teardown_infra` templates into `/tmp/infrapilot-template-validation`
+- Rendered current `setup_infra`, `deploy_service`, `scale_service`, `stop_service`, `teardown_service`, and `teardown_infra` templates into `/tmp/infrapilot-template-validation`
+- `scale_service`, `stop_service`, and `teardown_service` were rendered into separate validation directories under `/tmp/infrapilot-template-validation`
 - Terraform CLI is installed locally as `v1.14.9`
-- Rendered infra, service, and teardown-infra Terraform passed `terraform fmt -check`
-- Rendered infra, service, and teardown-infra Terraform passed `terraform init -backend=false` and `terraform validate`
+- Rendered infra, service, scale-service, stop-service, teardown-service, and teardown-infra Terraform passed `terraform fmt -check`
+- Rendered infra, service, scale-service, stop-service, teardown-service, and teardown-infra Terraform passed `terraform init -backend=false` and `terraform validate`
 - Review summary for teammates and mentor lives in `review-summary.md`
 - Local verification dependencies are tracked in `InfraPilot/requirements.txt`
 
@@ -202,9 +258,14 @@ Currently included:
 - Read `plan.steps[0].generated_files["infra/main.tf"]` for current infrastructure Terraform content
 - Use `deploy_service` when you need the one currently generated service Terraform file
 - Read the Terraform step's `generated_files["service/{service_name}/main.tf"]` for current service Terraform content
+- Use `scale_service` when you need a service Terraform file with an updated desired replica count
+- Use `stop_service` when you need a service Terraform file with `desired_count = 0`
+- Use `teardown_service` when you need a service Terraform file attached to a destroy plan
 - Use `teardown_infra` when you need the current infrastructure Terraform file attached to a destroy plan
 - Provide the required infrastructure keys when testing `deploy_service`
-- Use scale, stop, and teardown service intents only to inspect placeholder plan structure for now
+- Provide stored service state in `project_state.services[service_name]` when testing `scale_service`
+- Provide stored service state in `project_state.services[service_name]` when testing `stop_service`
+- Provide stored service state in `project_state.services[service_name]` when testing `teardown_service`
 - Do not expect this module to run Terraform, Docker, AWS CLI, or backend calls
 
 Minimal current `setup_infra` example:
@@ -251,7 +312,6 @@ plan = build_execution_plan(
 - Real AWS account validation and hardening for the expanded infrastructure template
 - service command generation
 - multi-step setup-then-deploy behavior
-- scale, stop, and teardown service rendering
 - direct Terraform, Docker, or AWS execution
 - backend routing and persistence
 - stricter per-intent schemas and validation
@@ -259,4 +319,4 @@ plan = build_execution_plan(
 
 ## Summary
 
-Current status: Week 1 produced the workflow contract, basic validation, deterministic dispatch, a renderer, and generated `setup_infra` Terraform. Week 2 now has expanded infrastructure generation, one generated `deploy_service` Terraform file, generated `teardown_infra` destroy-plan input, narrow deploy infrastructure validation, and review/integration handoff materials while keeping execution outside the workflow module.
+Current status: Week 1 produced the workflow contract, basic validation, deterministic dispatch, a renderer, and generated `setup_infra` Terraform. Week 2 now has expanded infrastructure generation, generated `deploy_service`, `scale_service`, `stop_service`, `teardown_service`, and `teardown_infra` Terraform inputs, narrow service validation, and review/integration handoff materials while keeping execution outside the workflow module.

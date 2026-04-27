@@ -5,7 +5,7 @@ This summary is for teammate and mentor review of the current Person C workflow/
 ## What To Review
 
 - `InfraPilot/workflow/engine.py`: current workflow dispatch, expanded `setup_infra` generation, and minimal `deploy_service` generation.
-- `InfraPilot/workflow/validation/basic.py`: current structural validation and required `deploy_service` infrastructure keys.
+- `InfraPilot/workflow/validation/basic.py`: current structural validation, required service infrastructure keys, and stored service-state checks for non-deploy service intents.
 - `InfraPilot/workflow/templates/infra/main.tf.j2`: combined infrastructure Terraform template.
 - `InfraPilot/workflow/templates/service/main.tf.j2`: minimal ECS service Terraform template.
 - `InfraPilot/tests/workflow/test_engine.py`: tracked workflow contract tests.
@@ -27,6 +27,15 @@ terraform -chdir=/tmp/infrapilot-template-validation/infra validate
 terraform -chdir=/tmp/infrapilot-template-validation/service/api fmt -check -diff
 terraform -chdir=/tmp/infrapilot-template-validation/service/api init -backend=false
 terraform -chdir=/tmp/infrapilot-template-validation/service/api validate
+terraform -chdir=/tmp/infrapilot-template-validation/scale-service/api fmt -check -diff
+terraform -chdir=/tmp/infrapilot-template-validation/scale-service/api init -backend=false
+terraform -chdir=/tmp/infrapilot-template-validation/scale-service/api validate
+terraform -chdir=/tmp/infrapilot-template-validation/stop-service/api fmt -check -diff
+terraform -chdir=/tmp/infrapilot-template-validation/stop-service/api init -backend=false
+terraform -chdir=/tmp/infrapilot-template-validation/stop-service/api validate
+terraform -chdir=/tmp/infrapilot-template-validation/teardown-service/api fmt -check -diff
+terraform -chdir=/tmp/infrapilot-template-validation/teardown-service/api init -backend=false
+terraform -chdir=/tmp/infrapilot-template-validation/teardown-service/api validate
 terraform -chdir=/tmp/infrapilot-template-validation/teardown-infra fmt -check -diff
 terraform -chdir=/tmp/infrapilot-template-validation/teardown-infra init -backend=false
 terraform -chdir=/tmp/infrapilot-template-validation/teardown-infra validate
@@ -35,7 +44,7 @@ terraform -chdir=/tmp/infrapilot-template-validation/teardown-infra validate
 Latest local result:
 
 ```text
-Ran 5 tests in 0.005s
+Ran 10 tests in 0.006s
 OK
 ```
 
@@ -49,11 +58,16 @@ python3 -m json.tool
 
 - `setup_infra` generates one combined Terraform file: `infra/main.tf`.
 - `deploy_service` generates one minimal Terraform file on its Terraform step: `service/{service_name}/main.tf`.
+- `scale_service` generates one service Terraform file on its apply step: `service/{service_name}/main.tf`.
+- `stop_service` generates one service Terraform file on its apply step: `service/{service_name}/main.tf`.
+- `teardown_service` generates one service Terraform file on its destroy step: `service/{service_name}/main.tf`.
 - `teardown_infra` generates one combined Terraform file on its destroy step: `infra/main.tf`.
 - The first three `deploy_service` shell steps remain placeholders.
-- `service_name` falls back to `project_state.project_name` only when missing or blank, and the plan records that fallback in `notes`.
+- `deploy_service` and `scale_service` still fall back to `project_state.project_name` when `service_name` is missing or blank, and the plan records that fallback in `notes`.
+- `stop_service` and `teardown_service` now require explicit `service_name` instead of falling back to `project_state.project_name`.
+- `teardown_service` now tolerates sparse stored service metadata by filling omitted deploy-time fields with deterministic defaults for destroy planning.
 - Terraform `v1.14.9` is installed locally.
-- Rendered infra and service Terraform files pass `fmt`, `init`, and `validate` in `/tmp/infrapilot-template-validation`.
+- Rendered infra, service, scale-service, stop-service, teardown-service, and teardown-infra Terraform files pass `fmt`, `init`, and `validate` in `/tmp/infrapilot-template-validation`.
 
 ## Deferred
 
@@ -62,5 +76,4 @@ python3 -m json.tool
 - backend and CLI integration code
 - infrastructure hardening after real AWS validation
 - multi-step setup-then-deploy behavior
-- scale, stop, and teardown service rendering
 - real AWS validation

@@ -39,3 +39,11 @@
 - Deferred Intentionally: Terraform destroy execution, state management, AWS credential handling, backend routing, and service teardown rendering.
 - Notes: This prepares destroy-plan file content only; it does not run Terraform or decide how state is stored.
 - Next Step: Wait for backend source files or choose the next service lifecycle intent after deciding whether it should be Terraform-driven or command/API-driven.
+
+## Week 2 Service Lifecycle Planning Completion
+
+- Goal: Replace the remaining service-intent placeholders with deterministic planning contracts while keeping the planner architecture intact.
+- Completed: Wired `scale_service`, `stop_service`, and `teardown_service` to generate `service/{service_name}/main.tf`, added stored service-state validation, added contract tests for all service lifecycle intents, validated rendered Terraform for each new intent, and synced contract/handoff/status docs.
+- Deferred Intentionally: Terraform execution, command generation, backend route integration, persistence, state import strategy, and real AWS validation.
+- Notes: Non-deploy service lifecycle intents now rely on `project_state.services[service_name]` plus existing infrastructure state, with explicit `service_name` fallback notes when `entities['service_name']` is absent.
+- Next Step: Coordinate backend integration if backend source arrives, or decide whether the next round should harden service-state shape and execution handoff details rather than adding more planner surface area.

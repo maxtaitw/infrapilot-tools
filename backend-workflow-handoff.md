@@ -165,6 +165,191 @@ Important current details:
 - If `entities["service_name"]` is missing or blank, the workflow uses `project_state.project_name` and adds an explicit note.
 - `environment_variables` may be a flat dictionary.
 
+## `scale_service` Example
+
+Input:
+
+```python
+WorkflowInput(
+    intent="scale_service",
+    entities={"service_name": "api", "replicas": 4},
+    project_state=ProjectState(
+        project_name="demo-project",
+        region="us-east-1",
+        infrastructure={
+            "cluster_arn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+            "vpc_id": "vpc-123",
+            "private_subnet_ids": ["subnet-123", "subnet-456"],
+            "alb_listener_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/demo/1/2",
+            "ecs_task_security_group_id": "sg-123",
+            "ecr_url": "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo",
+        },
+        services={
+            "api": {
+                "port": 3000,
+                "cpu": 256,
+                "memory": 512,
+                "replicas": 2,
+                "image_tag": "v1",
+                "environment_variables": {"NODE_ENV": "production"},
+            }
+        },
+    ),
+)
+```
+
+Output shape:
+
+```python
+ExecutionPlan(
+    intent="scale_service",
+    steps=[
+        PlanStep(
+            name="scale_service",
+            type="terraform_apply",
+            description="Apply the service scaling Terraform workflow step.",
+            generated_files={
+                "service/api/main.tf": "<rendered Terraform for the existing service with desired_count set to 4>"
+            },
+        )
+    ],
+    notes=[
+        "Generates one service Terraform file for scale_service using stored service state; Terraform execution remains deferred."
+    ],
+    requires_confirmation=True,
+)
+```
+
+Important current details:
+
+- `scale_service` reuses `project_state.services[service_name]` for stored service configuration.
+- `entities["replicas"]` is required and must be an integer greater than or equal to `1`.
+- The generated file path matches `deploy_service`: `service/{service_name}/main.tf`.
+
+## `stop_service` Example
+
+Input:
+
+```python
+WorkflowInput(
+    intent="stop_service",
+    entities={"service_name": "api"},
+    project_state=ProjectState(
+        project_name="demo-project",
+        region="us-east-1",
+        infrastructure={
+            "cluster_arn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+            "vpc_id": "vpc-123",
+            "private_subnet_ids": ["subnet-123", "subnet-456"],
+            "alb_listener_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/demo/1/2",
+            "ecs_task_security_group_id": "sg-123",
+            "ecr_url": "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo",
+        },
+        services={
+            "api": {
+                "port": 3000,
+                "cpu": 256,
+                "memory": 512,
+                "replicas": 2,
+                "image_tag": "v1",
+                "environment_variables": {"NODE_ENV": "production"},
+            }
+        },
+    ),
+)
+```
+
+Output shape:
+
+```python
+ExecutionPlan(
+    intent="stop_service",
+    steps=[
+        PlanStep(
+            name="stop_service",
+            type="terraform_apply",
+            description="Apply the service stop Terraform workflow step.",
+            generated_files={
+                "service/api/main.tf": "<rendered Terraform for the existing service with desired_count forced to 0>"
+            },
+        )
+    ],
+    notes=[
+        "Generates one service Terraform file for stop_service using stored service state with replicas forced to 0; Terraform execution remains deferred."
+    ],
+    requires_confirmation=True,
+)
+```
+
+Important current details:
+
+- `stop_service` reuses `project_state.services[service_name]` for stored service configuration.
+- `stop_service` does not require `entities["replicas"]`; it always renders `desired_count = 0`.
+- `stop_service` requires explicit `entities["service_name"]`; it does not fall back to `project_state.project_name`.
+- The generated file path matches `deploy_service` and `scale_service`: `service/{service_name}/main.tf`.
+
+## `teardown_service` Example
+
+Input:
+
+```python
+WorkflowInput(
+    intent="teardown_service",
+    entities={"service_name": "api"},
+    project_state=ProjectState(
+        project_name="demo-project",
+        region="us-east-1",
+        infrastructure={
+            "cluster_arn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+            "vpc_id": "vpc-123",
+            "private_subnet_ids": ["subnet-123", "subnet-456"],
+            "alb_listener_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/demo/1/2",
+            "ecs_task_security_group_id": "sg-123",
+            "ecr_url": "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo",
+        },
+        services={
+            "api": {
+                "port": 3000,
+                "cpu": 256,
+                "memory": 512,
+                "replicas": 2,
+                "image_tag": "v1",
+                "environment_variables": {"NODE_ENV": "production"},
+            }
+        },
+    ),
+)
+```
+
+Output shape:
+
+```python
+ExecutionPlan(
+    intent="teardown_service",
+    steps=[
+        PlanStep(
+            name="teardown_service",
+            type="terraform_destroy",
+            description="Destroy the service Terraform workflow step.",
+            generated_files={
+                "service/api/main.tf": "<rendered Terraform for the existing service resources to be destroyed>"
+            },
+        )
+    ],
+    notes=[
+        "Generates one service Terraform file for teardown_service using stored service state; Terraform destroy execution remains deferred."
+    ],
+    requires_confirmation=True,
+)
+```
+
+Important current details:
+
+- `teardown_service` requires explicit `entities["service_name"]`; it does not fall back to `project_state.project_name`.
+- `teardown_service` currently reuses the same service Terraform template as deploy/scale/stop.
+- `teardown_service` only requires `project_state.services[service_name]` to exist as a dictionary. Missing deploy-time fields are filled with deterministic defaults so destroy planning does not fail on stale stored metadata.
+- The generated file path matches the other service intents: `service/{service_name}/main.tf`.
+
 ## Current Validation Failures
 
 `build_execution_plan(...)` raises `ValueError` with semicolon-joined validation messages.
@@ -181,6 +366,10 @@ Current validation includes:
   - `alb_listener_arn`
   - `ecs_task_security_group_id`
   - `ecr_url`
+- `scale_service`, `stop_service`, and `teardown_service` currently require the same infrastructure keys because they reuse the service Terraform template
+- `scale_service`, `stop_service`, and `teardown_service` require `project_state.services[service_name]`
+- `stop_service` and `teardown_service` require explicit `entities["service_name"]`
+- `scale_service` requires `entities["replicas"]`
 
 Example failure:
 
@@ -200,5 +389,4 @@ The workflow module does not currently do:
 - AWS CLI execution
 - CLI display or confirmation handling
 - real shell command generation
-- scale, stop, or teardown service rendering
 - multi-step setup-then-deploy planning

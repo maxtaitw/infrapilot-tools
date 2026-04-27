@@ -125,15 +125,7 @@ def _build_deploy_service_plan(data: WorkflowInput) -> ExecutionPlan:
 
 def _resolve_deploy_service_variables(data: WorkflowInput) -> dict[str, object]:
     infrastructure = data.project_state.infrastructure
-    raw_service_name = data.entities.get("service_name")
-    service_name_fallback_used = (
-        raw_service_name is None or not str(raw_service_name).strip()
-    )
-    service_name = (
-        data.project_state.project_name
-        if service_name_fallback_used
-        else str(raw_service_name).strip()
-    )
+    service_name, service_name_fallback_used = _resolve_service_name(data)
 
     return {
         "service_name": service_name,
@@ -157,45 +149,175 @@ def _resolve_deploy_service_variables(data: WorkflowInput) -> dict[str, object]:
     }
 
 
+def _resolve_service_name(
+    data: WorkflowInput, *, allow_fallback: bool = True
+) -> tuple[str, bool]:
+    raw_service_name = data.entities.get("service_name")
+    service_name_fallback_used = (
+        allow_fallback and (raw_service_name is None or not str(raw_service_name).strip())
+    )
+    service_name = (
+        data.project_state.project_name
+        if service_name_fallback_used
+        else str(raw_service_name).strip()
+    )
+    return service_name, service_name_fallback_used
+
+
+def _resolve_existing_service_variables(
+    data: WorkflowInput, *, replicas: int, allow_fallback: bool = True
+) -> dict[str, object]:
+    infrastructure = data.project_state.infrastructure
+    service_name, service_name_fallback_used = _resolve_service_name(
+        data,
+        allow_fallback=allow_fallback,
+    )
+    service_state = data.project_state.services[service_name]
+
+    return {
+        "service_name": service_name,
+        "service_name_fallback_used": service_name_fallback_used,
+        "region": data.entities.get(
+            "region",
+            data.project_state.region if data.project_state.region else "us-east-1",
+        ),
+        "port": service_state["port"],
+        "cpu": service_state["cpu"],
+        "memory": service_state["memory"],
+        "replicas": replicas,
+        "environment_variables": service_state.get("environment_variables", {}),
+        "image_tag": service_state["image_tag"],
+        "cluster_arn": infrastructure["cluster_arn"],
+        "vpc_id": infrastructure["vpc_id"],
+        "private_subnet_ids": infrastructure["private_subnet_ids"],
+        "alb_listener_arn": infrastructure["alb_listener_arn"],
+        "ecs_task_security_group_id": infrastructure["ecs_task_security_group_id"],
+        "ecr_url": infrastructure["ecr_url"],
+    }
+
+
+def _resolve_teardown_service_variables(data: WorkflowInput) -> dict[str, object]:
+    infrastructure = data.project_state.infrastructure
+    service_name, _ = _resolve_service_name(data, allow_fallback=False)
+    service_state = data.project_state.services[service_name]
+    used_defaults = any(
+        key not in service_state or service_state[key] in ("", None)
+        for key in ("port", "cpu", "memory", "replicas", "image_tag")
+    )
+
+    return {
+        "service_name": service_name,
+        "service_name_fallback_used": False,
+        "used_service_state_defaults": used_defaults,
+        "region": data.entities.get(
+            "region",
+            data.project_state.region if data.project_state.region else "us-east-1",
+        ),
+        "port": service_state.get("port", 3000),
+        "cpu": service_state.get("cpu", 256),
+        "memory": service_state.get("memory", 512),
+        "replicas": service_state.get("replicas", 1),
+        "environment_variables": service_state.get("environment_variables", {}),
+        "image_tag": service_state.get("image_tag", "latest"),
+        "cluster_arn": infrastructure["cluster_arn"],
+        "vpc_id": infrastructure["vpc_id"],
+        "private_subnet_ids": infrastructure["private_subnet_ids"],
+        "alb_listener_arn": infrastructure["alb_listener_arn"],
+        "ecs_task_security_group_id": infrastructure["ecs_task_security_group_id"],
+        "ecr_url": infrastructure["ecr_url"],
+    }
+
+
 def _build_scale_service_plan(data: WorkflowInput) -> ExecutionPlan:
+    resolved_variables = _resolve_existing_service_variables(
+        data,
+        replicas=int(data.entities["replicas"]),
+    )
+    service_name = str(resolved_variables["service_name"])
+    notes = [
+        "Generates one service Terraform file for scale_service using stored service state; Terraform execution remains deferred."
+    ]
+    if resolved_variables["service_name_fallback_used"]:
+        notes.append(
+            "scale_service used project_state.project_name as service_name because entities['service_name'] was not provided."
+        )
+
     return ExecutionPlan(
         intent=data.intent,
         steps=[
             PlanStep(
                 name="scale_service",
                 type="terraform_apply",
-                description="Apply the scaling workflow placeholder step.",
+                description="Apply the service scaling Terraform workflow step.",
+                generated_files={
+                    f"service/{service_name}/main.tf": render_template(
+                        "service/main.tf.j2",
+                        resolved_variables,
+                    )
+                },
             )
         ],
-        notes=["Generated files are deferred in this iteration."],
+        notes=notes,
     )
 
 
 def _build_stop_service_plan(data: WorkflowInput) -> ExecutionPlan:
+    resolved_variables = _resolve_existing_service_variables(
+        data,
+        replicas=0,
+        allow_fallback=False,
+    )
+    service_name = str(resolved_variables["service_name"])
+    notes = [
+        "Generates one service Terraform file for stop_service using stored service state with replicas forced to 0; Terraform execution remains deferred."
+    ]
+
     return ExecutionPlan(
         intent=data.intent,
         steps=[
             PlanStep(
                 name="stop_service",
                 type="terraform_apply",
-                description="Apply the stop workflow placeholder step.",
+                description="Apply the service stop Terraform workflow step.",
+                generated_files={
+                    f"service/{service_name}/main.tf": render_template(
+                        "service/main.tf.j2",
+                        resolved_variables,
+                    )
+                },
             )
         ],
-        notes=["Generated files are deferred in this iteration."],
+        notes=notes,
     )
 
 
 def _build_teardown_service_plan(data: WorkflowInput) -> ExecutionPlan:
+    resolved_variables = _resolve_teardown_service_variables(data)
+    service_name = str(resolved_variables["service_name"])
+    notes = [
+        "Generates one service Terraform file for teardown_service using stored service identity and Terraform-safe defaults for omitted deploy-time fields; Terraform destroy execution remains deferred."
+    ]
+    if resolved_variables["used_service_state_defaults"]:
+        notes.append(
+            "teardown_service filled missing stored service fields with deterministic defaults so destroy planning does not fail on stale deploy-time metadata."
+        )
+
     return ExecutionPlan(
         intent=data.intent,
         steps=[
             PlanStep(
                 name="teardown_service",
                 type="terraform_destroy",
-                description="Destroy the service workflow placeholder step.",
+                description="Destroy the service Terraform workflow step.",
+                generated_files={
+                    f"service/{service_name}/main.tf": render_template(
+                        "service/main.tf.j2",
+                        resolved_variables,
+                    )
+                },
             )
         ],
-        notes=["Generated files are deferred in this iteration."],
+        notes=notes,
     )
 
 
