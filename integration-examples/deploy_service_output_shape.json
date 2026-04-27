@@ -4,20 +4,71 @@
     {
       "name": "build_container_image",
       "type": "shell_command",
-      "description": "Build the service image placeholder step.",
-      "generated_files": {}
+      "description": "Build the service container image.",
+      "generated_files": {},
+      "execution_payload": {
+        "command": {
+          "binary": "docker",
+          "args": [
+            "build",
+            "-t",
+            "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo:v1",
+            "."
+          ],
+          "env": {},
+          "working_directory": "."
+        },
+        "stdin_source": null
+      }
     },
     {
       "name": "authenticate_to_ecr",
       "type": "shell_command",
-      "description": "Authenticate to the registry placeholder step.",
-      "generated_files": {}
+      "description": "Authenticate Docker to Amazon ECR.",
+      "generated_files": {},
+      "execution_payload": {
+        "command": {
+          "binary": "docker",
+          "args": [
+            "login",
+            "--username",
+            "AWS",
+            "--password-stdin",
+            "123456789012.dkr.ecr.us-east-1.amazonaws.com"
+          ],
+          "env": {},
+          "working_directory": null
+        },
+        "stdin_source": {
+          "binary": "aws",
+          "args": [
+            "ecr",
+            "get-login-password",
+            "--region",
+            "us-east-1"
+          ],
+          "env": {},
+          "working_directory": null
+        }
+      }
     },
     {
       "name": "push_container_image",
       "type": "shell_command",
-      "description": "Push the service image placeholder step.",
-      "generated_files": {}
+      "description": "Push the service container image to Amazon ECR.",
+      "generated_files": {},
+      "execution_payload": {
+        "command": {
+          "binary": "docker",
+          "args": [
+            "push",
+            "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo:v1"
+          ],
+          "env": {},
+          "working_directory": null
+        },
+        "stdin_source": null
+      }
     },
     {
       "name": "apply_service_infrastructure",
@@ -25,11 +76,12 @@
       "description": "Apply the minimal service Terraform workflow step.",
       "generated_files": {
         "service/api/main.tf": "<rendered Terraform for log group, target group, listener rule, task definition, ECS service, and outputs>"
-      }
+      },
+      "execution_payload": null
     }
   ],
   "notes": [
-    "Generates one minimal service Terraform file for deploy_service; shell command content remains deferred."
+    "Generates one minimal service Terraform file for deploy_service plus deterministic shell command payloads; execution remains deferred."
   ],
   "requires_confirmation": true
 }

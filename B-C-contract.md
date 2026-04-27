@@ -119,6 +119,20 @@ General rule:
       "type": "terraform_apply | terraform_destroy | shell_command",
       "description": str,
       "generated_files": {str: str},
+      "execution_payload": {
+        "command": {
+          "binary": str,
+          "args": list[str],
+          "env": dict[str, str],
+          "working_directory": str | None,
+        },
+        "stdin_source": {
+          "binary": str,
+          "args": list[str],
+          "env": dict[str, str],
+          "working_directory": str | None,
+        } | None,
+      } | None,
     }
   ],
   "notes": list[str],
@@ -127,6 +141,15 @@ General rule:
 ```
 
 `generated_files` is now real for `setup_infra`, `teardown_infra`, `scale_service`, `stop_service`, `teardown_service`, and the Terraform step of `deploy_service`.
+`execution_payload` is optional. It is currently populated for the three `deploy_service` shell steps and remains `None` for Terraform-only steps.
+
+Current shell payload shape:
+
+- `command.binary`
+- `command.args`
+- optional `command.env`
+- optional `command.working_directory`
+- optional `stdin_source` with the same nested command shape
 
 ## `setup_infra` Behavior
 
@@ -149,15 +172,16 @@ Current plan:
 - one `terraform_destroy` step named `teardown_infrastructure`
 - generated file: `infra/main.tf`
 - uses the same infrastructure template and variable priority as `setup_infra`
+- rejects destroy planning when `project_state.services` is non-empty
 - prepares Terraform destroy input only; Terraform execution remains outside the workflow module
 
 ## `deploy_service` Behavior
 
 Current plan:
 
-- `build_container_image` shell placeholder step
-- `authenticate_to_ecr` shell placeholder step
-- `push_container_image` shell placeholder step
+- `build_container_image` shell step with structured command payload
+- `authenticate_to_ecr` shell step with structured command payload
+- `push_container_image` shell step with structured command payload
 - `apply_service_infrastructure` Terraform step with generated service Terraform
 
 Generated file:
@@ -172,6 +196,7 @@ Current Terraform coverage is minimal:
 - ECS task definition
 - ECS service
 - service-related outputs
+- explicit ECS task execution role wiring
 
 Current `service_name` rule:
 
@@ -186,7 +211,22 @@ Current required `project_state.infrastructure` keys for `deploy_service`:
 - `private_subnet_ids`
 - `alb_listener_arn`
 - `ecs_task_security_group_id`
+- `ecs_task_execution_role_arn`
 - `ecr_url`
+
+Current deploy shell payload behavior:
+
+- `build_container_image` emits a structured Docker build command
+- `authenticate_to_ecr` emits a structured Docker login command plus a structured AWS CLI `stdin_source`
+- `push_container_image` emits a structured Docker push command
+- workflow-core does not execute any of these commands
+
+Current deploy shell payload assumptions:
+
+- Docker build uses `working_directory="."` and build context `.`
+- image references use `{ecr_url}:{image_tag}`
+- ECR authentication is represented as a two-part command contract rather than a shell pipe string
+- if a future executor needs different workspace layout or Dockerfile behavior, the workflow input/output contract should expand explicitly
 
 ## `scale_service` Behavior
 
@@ -200,8 +240,9 @@ Current plan:
 
 Current `service_name` rule:
 
-- require `entities["service_name"]` explicitly
-- do not fall back to `project_state.project_name`
+- use `entities["service_name"]` when provided and non-empty
+- otherwise use `project_state.project_name`
+- when fallback is used, the plan includes an explicit note
 
 ## `stop_service` Behavior
 
@@ -215,9 +256,8 @@ Current plan:
 
 Current `service_name` rule:
 
-- use `entities["service_name"]` when provided and non-empty
-- otherwise use `project_state.project_name`
-- when fallback is used, the plan includes an explicit note
+- require `entities["service_name"]` explicitly
+- do not fall back to `project_state.project_name`
 
 ## `teardown_service` Behavior
 
@@ -245,12 +285,19 @@ Current validation rules:
 - `project_state.services` must be a dictionary
 - `entities` must be flat, except `environment_variables` may be a flat dictionary
 - `deploy_service`, `scale_service`, `stop_service`, and `teardown_service` require non-empty `project_state.infrastructure`
-- `deploy_service` requires the six infrastructure keys listed above
-- `scale_service`, `stop_service`, and `teardown_service` currently require the same six infrastructure keys because they reuse the service Terraform template
+- `teardown_infra` requires empty `project_state.services`
+- `deploy_service` requires the seven infrastructure keys listed above
+- `scale_service`, `stop_service`, and `teardown_service` currently require the same seven infrastructure keys because they reuse the service Terraform template
 - `scale_service`, `stop_service`, and `teardown_service` require `project_state.services[service_name]`
 - `scale_service` and `stop_service` require `project_state.services[service_name]` keys `port`, `cpu`, `memory`, and `image_tag`
 - `stop_service` and `teardown_service` require explicit `entities["service_name"]`
 - `scale_service` requires `entities["replicas"]` as an integer greater than or equal to `1`
+
+Current workflow-core integration boundary:
+
+- workflow-core plans one intent at a time
+- `deploy_service` does not auto-prepend `setup_infra`
+- if infrastructure is missing, validation fails and upstream should decide whether to ask for input or call `setup_infra` separately
 
 Validation messages are joined into one `ValueError` string.
 

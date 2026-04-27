@@ -11,6 +11,22 @@ from .inputs import IntentName
 StepType = Literal["terraform_apply", "terraform_destroy", "shell_command"]
 
 
+class CommandInvocation(BaseModel):
+    """A structured command description for downstream executors."""
+
+    binary: str
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    working_directory: str | None = None
+
+
+class ShellCommandPayload(BaseModel):
+    """A shell step payload with an optional command that feeds stdin."""
+
+    command: CommandInvocation
+    stdin_source: CommandInvocation | None = None
+
+
 class PlanStep(BaseModel):
     """A single deterministic step in an execution plan."""
 
@@ -18,6 +34,7 @@ class PlanStep(BaseModel):
     type: StepType
     description: str
     generated_files: dict[str, str] = Field(default_factory=dict)
+    execution_payload: ShellCommandPayload | None = None
 
 
 class ExecutionPlan(BaseModel):

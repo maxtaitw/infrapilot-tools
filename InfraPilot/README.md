@@ -127,11 +127,34 @@ ExecutionPlan(
 )
 ```
 
+Each `PlanStep` currently includes:
+
+- `name`
+- `type`
+- `description`
+- `generated_files`
+- optional `execution_payload`
+
 Behavioral notes:
 
+- This package plans one intent at a time. Upstream orchestrators may call `setup_infra` and `deploy_service` separately, but workflow-core does not combine them into one plan.
+- `deploy_service` still requires existing infrastructure state. Missing required infrastructure remains a validation failure.
 - `deploy_service` and `scale_service` may fall back to `project_state.project_name` for `service_name`.
 - `stop_service` and `teardown_service` require explicit `entities["service_name"]`.
+- `teardown_infra` requires empty `project_state.services`.
 - `teardown_service` tolerates sparse stored service metadata by filling omitted deploy-time fields with deterministic defaults during destroy planning.
+- Service-rendering intents expect `project_state.infrastructure` to include `ecs_task_execution_role_arn`, and the rendered ECS task definition wires that value into `execution_role_arn`.
+- `deploy_service` shell steps now emit structured `execution_payload` data for downstream executors. The current payload shape is:
+  - `command.binary`
+  - `command.args`
+  - optional `command.env`
+  - optional `command.working_directory`
+  - optional `stdin_source` with the same nested command shape
+- Current deploy payload assumptions are intentionally narrow:
+  - Docker build uses `working_directory="."` and build context `.`
+  - image references use `{ecr_url}:{image_tag}`
+  - ECR authentication is modeled as `docker login --password-stdin` plus an AWS CLI `stdin_source`
+  - if downstream runtime layout differs, the workflow contract should expand instead of expecting executors to guess
 - This package does not execute Terraform, Docker, or AWS commands.
 
 ## Local Verification
@@ -154,4 +177,4 @@ python3.13 -m venv .venv
 
 ## Next Steps
 
-Future iterations should harden Terraform coverage, refine command structures for downstream executors, and preserve the current boundary where agents or backends orchestrate around this deterministic core.
+Future iterations should harden Terraform coverage, refine downstream execution handling around the new shell payload contract, and preserve the current boundary where backends or orchestrators coordinate multi-step flows outside this deterministic core.

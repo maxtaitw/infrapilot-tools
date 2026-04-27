@@ -5,7 +5,7 @@ This summary is for teammate and mentor review of the current Person C workflow/
 ## What To Review
 
 - `InfraPilot/workflow/engine.py`: current workflow dispatch, expanded `setup_infra` generation, and minimal `deploy_service` generation.
-- `InfraPilot/workflow/validation/basic.py`: current structural validation, required service infrastructure keys, and stored service-state checks for non-deploy service intents.
+- `InfraPilot/workflow/validation/basic.py`: current structural validation, required service infrastructure keys including ECS task execution role wiring, and stored service-state checks for non-deploy service intents.
 - `InfraPilot/workflow/templates/infra/main.tf.j2`: combined infrastructure Terraform template.
 - `InfraPilot/workflow/templates/service/main.tf.j2`: minimal ECS service Terraform template.
 - `InfraPilot/tests/workflow/test_engine.py`: tracked workflow contract tests.
@@ -44,7 +44,7 @@ terraform -chdir=/tmp/infrapilot-template-validation/teardown-infra validate
 Latest local result:
 
 ```text
-Ran 10 tests in 0.006s
+Ran 15 tests in 0.007s
 OK
 ```
 
@@ -62,7 +62,12 @@ python3 -m json.tool
 - `stop_service` generates one service Terraform file on its apply step: `service/{service_name}/main.tf`.
 - `teardown_service` generates one service Terraform file on its destroy step: `service/{service_name}/main.tf`.
 - `teardown_infra` generates one combined Terraform file on its destroy step: `infra/main.tf`.
-- The first three `deploy_service` shell steps remain placeholders.
+- `teardown_infra` now rejects planning when `project_state.services` is non-empty.
+- Service-rendering intents now require `ecs_task_execution_role_arn` in `project_state.infrastructure`, and rendered ECS task definitions include `execution_role_arn`.
+- `PlanStep` now exposes an optional structured `execution_payload` field.
+- The first three `deploy_service` shell steps still have empty `generated_files`, but now include machine-readable shell command payloads.
+- Those shell payloads currently assume Docker build context `.` and model ECR login as a Docker command plus an AWS CLI `stdin_source`; executors still own runtime execution behavior.
+- workflow-core still plans one intent at a time; setup and deploy remain separate upstream calls.
 - `deploy_service` and `scale_service` still fall back to `project_state.project_name` when `service_name` is missing or blank, and the plan records that fallback in `notes`.
 - `stop_service` and `teardown_service` now require explicit `service_name` instead of falling back to `project_state.project_name`.
 - `teardown_service` now tolerates sparse stored service metadata by filling omitted deploy-time fields with deterministic defaults for destroy planning.
@@ -71,9 +76,9 @@ python3 -m json.tool
 
 ## Deferred
 
-- real shell command generation
+- shell command execution
 - Terraform execution
 - backend and CLI integration code
 - infrastructure hardening after real AWS validation
-- multi-step setup-then-deploy behavior
+- multi-intent orchestration inside workflow-core
 - real AWS validation

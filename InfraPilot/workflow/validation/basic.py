@@ -17,6 +17,7 @@ DEPLOY_SERVICE_REQUIRED_INFRASTRUCTURE_KEYS = {
     "private_subnet_ids",
     "alb_listener_arn",
     "ecs_task_security_group_id",
+    "ecs_task_execution_role_arn",
     "ecr_url",
 }
 
@@ -203,6 +204,14 @@ def validate_scale_service_entities(entities: dict[str, object]) -> list[str]:
     return []
 
 
+def validate_teardown_infra_service_state(state: ProjectState) -> list[str]:
+    """Prevent infrastructure teardown while tracked service state still exists."""
+
+    if state.services:
+        return ["intent 'teardown_infra' requires empty project_state.services"]
+    return []
+
+
 def validate_workflow_input(data: WorkflowInput) -> list[str]:
     """Validate workflow input before the engine builds a plan."""
 
@@ -253,5 +262,8 @@ def validate_workflow_input(data: WorkflowInput) -> list[str]:
                 allow_fallback=False,
             )
         )
+
+    if data.intent == "teardown_infra":
+        errors.extend(validate_teardown_infra_service_state(data.project_state))
 
     return errors

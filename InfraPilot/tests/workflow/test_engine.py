@@ -26,6 +26,9 @@ def sample_infrastructure() -> dict[str, object]:
             "listener/app/demo/1/2"
         ),
         "ecs_task_security_group_id": "sg-123",
+        "ecs_task_execution_role_arn": (
+            "arn:aws:iam::123456789012:role/demo-project-ecs-task-execution-role"
+        ),
         "ecr_url": "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo",
     }
 
@@ -132,11 +135,44 @@ class BuildExecutionPlanTests(unittest.TestCase):
             ["shell_command", "shell_command", "shell_command", "terraform_apply"],
             [step.type for step in plan.steps],
         )
-        for step in plan.steps[:3]:
+        build_step, auth_step, push_step = plan.steps[:3]
+        for step in (build_step, auth_step, push_step):
             self.assertEqual({}, step.generated_files)
+
+        self.assertEqual("docker", build_step.execution_payload.command.binary)
+        self.assertEqual(
+            ["build", "-t", "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo:v1", "."],
+            build_step.execution_payload.command.args,
+        )
+        self.assertEqual(".", build_step.execution_payload.command.working_directory)
+
+        self.assertEqual("docker", auth_step.execution_payload.command.binary)
+        self.assertEqual(
+            [
+                "login",
+                "--username",
+                "AWS",
+                "--password-stdin",
+                "123456789012.dkr.ecr.us-east-1.amazonaws.com",
+            ],
+            auth_step.execution_payload.command.args,
+        )
+        self.assertIsNotNone(auth_step.execution_payload.stdin_source)
+        self.assertEqual("aws", auth_step.execution_payload.stdin_source.binary)
+        self.assertEqual(
+            ["ecr", "get-login-password", "--region", "us-east-1"],
+            auth_step.execution_payload.stdin_source.args,
+        )
+
+        self.assertEqual("docker", push_step.execution_payload.command.binary)
+        self.assertEqual(
+            ["push", "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo:v1"],
+            push_step.execution_payload.command.args,
+        )
 
         terraform_step = plan.steps[3]
         self.assertIn("service/api/main.tf", terraform_step.generated_files)
+        self.assertIsNone(terraform_step.execution_payload)
         rendered = terraform_step.generated_files["service/api/main.tf"]
         expected_content = [
             'resource "aws_cloudwatch_log_group" "main"',
@@ -150,6 +186,7 @@ class BuildExecutionPlanTests(unittest.TestCase):
             "subnet-456",
             "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/demo/1/2",
             "sg-123",
+            "arn:aws:iam::123456789012:role/demo-project-ecs-task-execution-role",
             "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo:v1",
             "NODE_ENV",
         ]
@@ -174,6 +211,7 @@ class BuildExecutionPlanTests(unittest.TestCase):
             "private_subnet_ids",
             "alb_listener_arn",
             "ecs_task_security_group_id",
+            "ecs_task_execution_role_arn",
             "ecr_url",
         ]:
             self.assertIn(missing_key, message)
@@ -210,6 +248,7 @@ class BuildExecutionPlanTests(unittest.TestCase):
         expected_content = [
             'resource "aws_ecs_service" "main"',
             "desired_count   = 4",
+            'execution_role_arn       = "arn:aws:iam::123456789012:role/demo-project-ecs-task-execution-role"',
             "123456789012.dkr.ecr.us-east-1.amazonaws.com/demo:v1",
             "NODE_ENV",
         ]
@@ -269,6 +308,25 @@ class BuildExecutionPlanTests(unittest.TestCase):
 
         self.assertIn("project_state.services['api']", str(context.exception))
 
+    def test_plan_step_execution_payload_defaults_to_none(self) -> None:
+        plan = build_execution_plan(
+            WorkflowInput(
+                intent="deploy_service",
+                entities={"service_name": "api"},
+                project_state=project_state_with_infrastructure(),
+            )
+        )
+
+        serialized_steps = [step.model_dump() for step in plan.steps]
+        for step in serialized_steps[:3]:
+            self.assertIn("execution_payload", step)
+            self.assertIn("command", step["execution_payload"])
+            self.assertIn("binary", step["execution_payload"]["command"])
+            self.assertIn("args", step["execution_payload"]["command"])
+
+        self.assertIn("execution_payload", serialized_steps[3])
+        self.assertIsNone(serialized_steps[3]["execution_payload"])
+
     def test_teardown_service_generates_destroy_service_file(self) -> None:
         plan = build_execution_plan(
             WorkflowInput(
@@ -291,6 +349,7 @@ class BuildExecutionPlanTests(unittest.TestCase):
             'resource "aws_lb_target_group" "main"',
             'resource "aws_ecs_task_definition" "main"',
             'resource "aws_ecs_service" "main"',
+            'execution_role_arn       = "arn:aws:iam::123456789012:role/demo-project-ecs-task-execution-role"',
         ]
         for expected in expected_content:
             self.assertIn(expected, rendered)
@@ -324,6 +383,20 @@ class BuildExecutionPlanTests(unittest.TestCase):
         self.assertIn("desired_count   = 1", rendered)
         self.assertTrue(
             any("filled missing stored service fields with deterministic defaults" in note for note in plan.notes)
+        )
+
+    def test_teardown_infra_requires_empty_service_state(self) -> None:
+        with self.assertRaises(ValueError) as context:
+            build_execution_plan(
+                WorkflowInput(
+                    intent="teardown_infra",
+                    project_state=project_state_with_service(),
+                )
+            )
+
+        self.assertIn(
+            "intent 'teardown_infra' requires empty project_state.services",
+            str(context.exception),
         )
 
     def test_teardown_infra_generates_destroy_infra_file(self) -> None:

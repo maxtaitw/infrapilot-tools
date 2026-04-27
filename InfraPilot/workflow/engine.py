@@ -81,8 +81,9 @@ def _resolve_setup_infra_variables(data: WorkflowInput) -> dict[str, object]:
 def _build_deploy_service_plan(data: WorkflowInput) -> ExecutionPlan:
     resolved_variables = _resolve_deploy_service_variables(data)
     service_name = str(resolved_variables["service_name"])
+    shell_payloads = _build_deploy_service_shell_payloads(resolved_variables)
     notes = [
-        "Generates one minimal service Terraform file for deploy_service; shell command content remains deferred."
+        "Generates one minimal service Terraform file for deploy_service plus deterministic shell command payloads; execution remains deferred."
     ]
     if resolved_variables["service_name_fallback_used"]:
         notes.append(
@@ -95,17 +96,20 @@ def _build_deploy_service_plan(data: WorkflowInput) -> ExecutionPlan:
             PlanStep(
                 name="build_container_image",
                 type="shell_command",
-                description="Build the service image placeholder step.",
+                description="Build the service container image.",
+                execution_payload=shell_payloads["build_container_image"],
             ),
             PlanStep(
                 name="authenticate_to_ecr",
                 type="shell_command",
-                description="Authenticate to the registry placeholder step.",
+                description="Authenticate Docker to Amazon ECR.",
+                execution_payload=shell_payloads["authenticate_to_ecr"],
             ),
             PlanStep(
                 name="push_container_image",
                 type="shell_command",
-                description="Push the service image placeholder step.",
+                description="Push the service container image to Amazon ECR.",
+                execution_payload=shell_payloads["push_container_image"],
             ),
             PlanStep(
                 name="apply_service_infrastructure",
@@ -145,7 +149,48 @@ def _resolve_deploy_service_variables(data: WorkflowInput) -> dict[str, object]:
         "private_subnet_ids": infrastructure["private_subnet_ids"],
         "alb_listener_arn": infrastructure["alb_listener_arn"],
         "ecs_task_security_group_id": infrastructure["ecs_task_security_group_id"],
+        "ecs_task_execution_role_arn": infrastructure["ecs_task_execution_role_arn"],
         "ecr_url": infrastructure["ecr_url"],
+    }
+
+
+def _build_deploy_service_shell_payloads(
+    variables: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    image_ref = f"{variables['ecr_url']}:{variables['image_tag']}"
+    ecr_registry = str(variables["ecr_url"]).split("/", 1)[0]
+    region = str(variables["region"])
+
+    return {
+        "build_container_image": {
+            "command": {
+                "binary": "docker",
+                "args": ["build", "-t", image_ref, "."],
+                "working_directory": ".",
+            }
+        },
+        "authenticate_to_ecr": {
+            "command": {
+                "binary": "docker",
+                "args": [
+                    "login",
+                    "--username",
+                    "AWS",
+                    "--password-stdin",
+                    ecr_registry,
+                ],
+            },
+            "stdin_source": {
+                "binary": "aws",
+                "args": ["ecr", "get-login-password", "--region", region],
+            },
+        },
+        "push_container_image": {
+            "command": {
+                "binary": "docker",
+                "args": ["push", image_ref],
+            }
+        },
     }
 
 
@@ -192,6 +237,7 @@ def _resolve_existing_service_variables(
         "private_subnet_ids": infrastructure["private_subnet_ids"],
         "alb_listener_arn": infrastructure["alb_listener_arn"],
         "ecs_task_security_group_id": infrastructure["ecs_task_security_group_id"],
+        "ecs_task_execution_role_arn": infrastructure["ecs_task_execution_role_arn"],
         "ecr_url": infrastructure["ecr_url"],
     }
 
@@ -224,6 +270,7 @@ def _resolve_teardown_service_variables(data: WorkflowInput) -> dict[str, object
         "private_subnet_ids": infrastructure["private_subnet_ids"],
         "alb_listener_arn": infrastructure["alb_listener_arn"],
         "ecs_task_security_group_id": infrastructure["ecs_task_security_group_id"],
+        "ecs_task_execution_role_arn": infrastructure["ecs_task_execution_role_arn"],
         "ecr_url": infrastructure["ecr_url"],
     }
 
